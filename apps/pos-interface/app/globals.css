@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-3 rounded-lg font-medium transition-all duration-200 touch-manipulation;
+    @apply active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+  
+  .btn-primary {
+    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+    @apply shadow-lg hover:shadow-xl;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500;
+  }
+  
+  .btn-success {
+    @apply bg-green-600 text-white hover:bg-green-700 focus:ring-green-500;
+  }
+  
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+  }
+  
+  .btn-lg {
+    @apply px-6 py-4 text-lg;
+  }
+  
+  .btn-xl {
+    @apply px-8 py-6 text-xl;
+  }
+  
+  .input-touch {
+    @apply block w-full px-4 py-3 text-lg border border-gray-300 rounded-lg;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
+    @apply touch-manipulation;
+  }
+  
+  .card-touch {
+    @apply bg-white rounded-xl shadow-lg border border-gray-200 p-6;
+    @apply touch-manipulation cursor-pointer;
+    @apply hover:shadow-xl transition-shadow duration-200;
+  }
+  
+  .menu-item-card {
+    @apply card-touch p-4 h-32 flex flex-col justify-between;
+    @apply active:scale-95 transition-transform duration-150;
+  }
+  
+  .category-tab {
+    @apply px-6 py-3 rounded-lg font-medium transition-all duration-200;
+    @apply touch-manipulation active:scale-95;
+  }
+  
+  .category-tab-active {
+    @apply bg-primary-600 text-white shadow-lg;
+  }
+  
+  .category-tab-inactive {
+    @apply bg-white text-gray-700 hover:bg-gray-50 shadow-sm;
+  }
+  
+  .cart-item {
+    @apply flex items-center justify-between p-4 bg-white rounded-lg shadow-sm;
+    @apply border border-gray-200 touch-manipulation;
+  }
+  
+  .quantity-btn {
+    @apply w-10 h-10 rounded-full flex items-center justify-center;
+    @apply bg-gray-100 hover:bg-gray-200 active:scale-90;
+    @apply transition-all duration-150 touch-manipulation;
+  }
+  
+  .table-btn {
+    @apply w-20 h-20 rounded-lg flex flex-col items-center justify-center;
+    @apply font-medium transition-all duration-200 touch-manipulation;
+    @apply active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+  
+  .table-btn-available {
+    @apply bg-green-100 text-green-800 hover:bg-green-200 focus:ring-green-500;
+  }
+  
+  .table-btn-occupied {
+    @apply bg-red-100 text-red-800 hover:bg-red-200 focus:ring-red-500;
+  }
+  
+  .table-btn-selected {
+    @apply bg-primary-100 text-primary-800 hover:bg-primary-200 focus:ring-primary-500;
+    @apply ring-2 ring-primary-500;
+  }
+  
+  .payment-method-btn {
+    @apply flex items-center justify-center p-6 rounded-xl;
+    @apply bg-white border-2 border-gray-200 hover:border-primary-500;
+    @apply transition-all duration-200 touch-manipulation active:scale-95;
+  }
+  
+  .payment-method-btn-selected {
+    @apply border-primary-500 bg-primary-50;
+  }
+  
+  .kitchen-order-card {
+    @apply bg-white rounded-lg shadow-lg p-4 border-l-4;
+    @apply touch-manipulation transition-all duration-200;
+  }
+  
+  .kitchen-order-pending {
+    @apply border-l-yellow-500;
+  }
+  
+  .kitchen-order-preparing {
+    @apply border-l-blue-500;
+  }
+  
+  .kitchen-order-ready {
+    @apply border-l-green-500;
+  }
+  
+  .kitchen-order-completed {
+    @apply border-l-gray-500;
+  }
+}
+
+@layer utilities {
+  .touch-none {
+    touch-action: none;
+  }
+  
+  .touch-pan-x {
+    touch-action: pan-x;
+  }
+  
+  .touch-pan-y {
+    touch-action: pan-y;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
