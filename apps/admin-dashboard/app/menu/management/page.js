@@ -7,6 +7,8 @@ import PermissionGate from '../../components/Auth/PermissionGate';
 import { useRoleManager } from '../../components/Auth/RoleManager';
 import CategoryManager from '../../components/Menu/CategoryManager';
 import MenuItemForm from '../../components/Menu/MenuItemForm';
+import MenuAnalytics from '../../components/Menu/MenuAnalytics';
+import MenuInventoryIntegration from '../../components/Menu/MenuInventoryIntegration';
 import Card from '../../components/UI/Card';
 import Button from '../../components/UI/Button';
 import Modal from '../../components/UI/Modal';
@@ -41,6 +43,8 @@ function MenuManagementContent() {
   const [editingItem, setEditingItem] = useState(null);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedItems, setSelectedItems] = useState([]);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showInventoryIntegration, setShowInventoryIntegration] = useState(true);
 
   const { selectedOutlet } = useTenant();
   const { PERMISSIONS, canAccessFeature } = useRoleManager();
@@ -152,6 +156,19 @@ function MenuManagementContent() {
     }
   };
 
+  const handleAvailabilityChange = async (itemId, isAvailable) => {
+    try {
+      await menuService.updateItemAvailability(itemId, isAvailable);
+      
+      // Update local state
+      setMenuItems(items => items.map(item => 
+        item.id === itemId ? { ...item, isAvailable } : item
+      ));
+    } catch (error) {
+      console.error('Failed to update availability:', error);
+    }
+  };
+
   const handleBulkAvailabilityToggle = async (available) => {
     if (selectedItems.length === 0) return;
 
@@ -230,6 +247,80 @@ function MenuManagementContent() {
           />
         </PermissionGate>
 
+        {/* Navigation Tabs */}
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => {
+                setShowAnalytics(false);
+                setShowInventoryIntegration(false);
+              }}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                !showAnalytics && !showInventoryIntegration
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Menu Items
+            </button>
+            <PermissionGate permission={PERMISSIONS.INVENTORY_VIEW}>
+              <button
+                onClick={() => {
+                  setShowInventoryIntegration(true);
+                  setShowAnalytics(false);
+                }}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  showInventoryIntegration
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Inventory Status
+              </button>
+            </PermissionGate>
+            <PermissionGate permission={PERMISSIONS.ANALYTICS_VIEW}>
+              <button
+                onClick={() => {
+                  setShowAnalytics(true);
+                  setShowInventoryIntegration(false);
+                }}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  showAnalytics
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Analytics
+              </button>
+            </PermissionGate>
+          </nav>
+        </div>
+
+        {/* Inventory Integration Tab */}
+        {showInventoryIntegration && (
+          <PermissionGate permission={PERMISSIONS.INVENTORY_VIEW}>
+            <MenuInventoryIntegration
+              menuItems={menuItems}
+              outletId={selectedOutlet?.id}
+              onAvailabilityChange={handleAvailabilityChange}
+              showAnalytics={true}
+            />
+          </PermissionGate>
+        )}
+
+        {/* Analytics Tab */}
+        {showAnalytics && (
+          <PermissionGate permission={PERMISSIONS.ANALYTICS_VIEW}>
+            <MenuAnalytics
+              menuItems={menuItems}
+              outletId={selectedOutlet?.id}
+            />
+          </PermissionGate>
+        )}
+
+        {/* Menu Items Tab (default) */}
+        {!showAnalytics && !showInventoryIntegration && (
+          <>
         {/* Filters and Controls */}
         <Card className="p-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
@@ -600,6 +691,8 @@ function MenuManagementContent() {
               </Button>
             </PermissionGate>
           </Card>
+        )}
+        </>
         )}
 
         {/* Menu Item Form Modal */}

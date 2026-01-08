@@ -60,7 +60,13 @@ class AuthService {
     const response = await this.api.get('/validate', {
       headers: { Authorization: `Bearer ${token}` }
     });
-    return response.data.user;
+    
+    // Handle the response format from the new validate endpoint
+    if (response.data.success) {
+      return response.data.user;
+    } else {
+      throw new Error(response.data.message || 'Token validation failed');
+    }
   }
 
   async refreshToken() {

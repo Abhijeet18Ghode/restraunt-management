@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { ValidationError } = require('@rms/shared');
+const { authenticateToken } = require('../middleware/auth');
 const TenantService = require('../services/TenantService');
 
 const router = express.Router();
@@ -55,6 +56,34 @@ router.post('/logout', (req, res) => {
     message: 'Logged out successfully',
     timestamp: new Date().toISOString(),
   });
+});
+
+/**
+ * GET /api/auth/validate
+ * Validate JWT token and return user data
+ */
+router.get('/validate', authenticateToken, async (req, res, next) => {
+  try {
+    // The authenticateToken middleware already validates the token
+    // and adds the decoded user data to req.user
+    const userData = {
+      id: req.user.userId,
+      tenantId: req.user.tenantId,
+      email: req.user.email,
+      role: req.user.role,
+      firstName: req.user.firstName,
+      lastName: req.user.lastName
+    };
+
+    res.json({
+      success: true,
+      message: 'Token is valid',
+      user: userData,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 /**

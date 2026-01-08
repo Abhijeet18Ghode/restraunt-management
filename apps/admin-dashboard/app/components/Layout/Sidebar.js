@@ -69,6 +69,12 @@ const navigation = [
         permission: 'menu.bulk.manage',
         roles: ['admin', 'manager']
       },
+      { 
+        name: 'Analytics', 
+        href: '/menu/analytics',
+        permission: 'analytics.view',
+        roles: ['admin', 'manager']
+      },
     ],
   },
   {
