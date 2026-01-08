@@ -37,7 +37,7 @@ app.use(helmet());
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://yourdomain.com'] 
-    : ['http://localhost:3000', 'http://localhost:3001'],
+    : ['http://localhost:3000', 'http://localhost:3011', 'http://localhost:3012'],
   credentials: true,
 }));
 
@@ -71,8 +71,8 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
-app.use('/api/tenants', tenantRoutes);
-app.use('/api/auth', authRoutes);
+app.use('/', tenantRoutes);
+app.use('/auth', authRoutes);
 
 // Error handling middleware
 app.use(notFoundHandler);
@@ -93,9 +93,18 @@ process.on('SIGINT', async () => {
 
 // Start server
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log(`Tenant Service running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV}`);
+    
+    // Test database connection
+    try {
+      await dbManager.testConnection();
+      console.log('✅ Database connected successfully');
+    } catch (error) {
+      console.error('❌ Database connection failed:', error.message);
+      console.log('⚠️  Service will continue but database operations will fail');
+    }
   });
 }
 

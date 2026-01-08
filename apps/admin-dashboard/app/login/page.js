@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    tenantId: '', // Add tenant ID field
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const result = await login(formData.email, formData.password);
+      const result = await login(formData.email, formData.password, formData.tenantId);
       
       if (result.success) {
         toast.success('Login successful!');
@@ -120,6 +121,24 @@ export default function LoginPage() {
                   )}
                 </button>
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="tenantId" className="block text-sm font-medium text-gray-700">
+                Tenant ID (Optional)
+              </label>
+              <input
+                id="tenantId"
+                name="tenantId"
+                type="text"
+                className="input mt-1"
+                placeholder="Enter tenant ID (leave empty for auto-detection)"
+                value={formData.tenantId}
+                onChange={handleChange}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Leave empty to auto-detect tenant from email
+              </p>
             </div>
           </div>
 

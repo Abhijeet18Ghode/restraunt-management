@@ -17,7 +17,12 @@ const server = createServer(app);
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3001', 'http://localhost:3002'],
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+    'http://localhost:3000',  // API Gateway
+    'http://localhost:3001',  // Tenant Service
+    'http://localhost:3002',  // POS Interface
+    'http://localhost:3011'   // Admin Dashboard
+  ],
   credentials: true,
 }));
 

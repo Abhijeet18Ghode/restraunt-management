@@ -4,8 +4,12 @@ const fs = require('fs');
 
 // Ensure logs directory exists
 const logsDir = path.join(process.cwd(), 'logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
+try {
+  if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true });
+  }
+} catch (error) {
+  console.warn('Could not create logs directory:', error.message);
 }
 
 // Custom format for structured logging
@@ -58,58 +62,13 @@ const logger = winston.createLogger({
     environment: process.env.NODE_ENV || 'development'
   },
   transports: [
-    // Error logs
-    new winston.transports.File({ 
-      filename: path.join(logsDir, 'error.log'), 
-      level: 'error',
-      maxsize: 10 * 1024 * 1024, // 10MB
-      maxFiles: 5,
-      tailable: true
-    }),
-    
-    // Combined logs
-    new winston.transports.File({ 
-      filename: path.join(logsDir, 'combined.log'),
-      maxsize: 10 * 1024 * 1024, // 10MB
-      maxFiles: 10,
-      tailable: true
-    }),
-    
-    // Access logs (for HTTP requests)
-    new winston.transports.File({ 
-      filename: path.join(logsDir, 'access.log'),
-      level: 'http',
-      maxsize: 10 * 1024 * 1024, // 10MB
-      maxFiles: 5,
-      tailable: true
-    })
-  ],
-  
-  // Handle exceptions and rejections
-  exceptionHandlers: [
-    new winston.transports.File({ 
-      filename: path.join(logsDir, 'exceptions.log'),
-      maxsize: 10 * 1024 * 1024,
-      maxFiles: 3
-    })
-  ],
-  
-  rejectionHandlers: [
-    new winston.transports.File({ 
-      filename: path.join(logsDir, 'rejections.log'),
-      maxsize: 10 * 1024 * 1024,
-      maxFiles: 3
+    // Console transport for all environments
+    new winston.transports.Console({
+      format: consoleFormat,
+      level: 'debug'
     })
   ]
 });
-
-// Add console transport for non-production environments
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: consoleFormat,
-    level: 'debug'
-  }));
-}
 
 // Custom logging methods for different contexts
 logger.request = (message, meta = {}) => {

@@ -86,6 +86,60 @@ class MenuService {
     return response.data;
   }
 
+  async bulkUpdateAvailability(itemIds, available) {
+    const response = await this.api.post('/items/bulk-availability', { 
+      itemIds, 
+      available 
+    });
+    return response.data;
+  }
+
+  async bulkUpdateCategory(itemIds, categoryId) {
+    const response = await this.api.post('/items/bulk-category', { 
+      itemIds, 
+      categoryId 
+    });
+    return response.data;
+  }
+
+  async copyItemsToOutlet(itemIds, sourceOutletId, targetOutletId, options = {}) {
+    const response = await this.api.post('/items/copy-to-outlet', {
+      itemIds,
+      sourceOutletId,
+      targetOutletId,
+      options
+    });
+    return response.data;
+  }
+
+  async syncMenuBetweenOutlets(sourceOutletId, targetOutletIds, syncOptions = {}) {
+    const response = await this.api.post('/menu/sync-outlets', {
+      sourceOutletId,
+      targetOutletIds,
+      syncOptions
+    });
+    return response.data;
+  }
+
+  // Pricing management
+  async getPriceHistory(itemId) {
+    const response = await this.api.get(`/items/${itemId}/price-history`);
+    return response.data;
+  }
+
+  async applyPricingRule(ruleId, itemIds) {
+    const response = await this.api.post('/pricing/apply-rule', {
+      ruleId,
+      itemIds
+    });
+    return response.data;
+  }
+
+  async getPricingRules(outletId) {
+    const response = await this.api.get(`/pricing/rules?outletId=${outletId}`);
+    return response.data;
+  }
+
   // Menu Management
   async getFullMenu(outletId) {
     const response = await this.api.get(`/full-menu?outletId=${outletId}`);

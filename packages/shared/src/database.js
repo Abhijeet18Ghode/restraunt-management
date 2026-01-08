@@ -23,6 +23,20 @@ class DatabaseManager {
   }
 
   /**
+   * Test database connection
+   */
+  async testConnection() {
+    try {
+      const client = await this.getConnection();
+      await client.query('SELECT NOW()');
+      client.release();
+      return true;
+    } catch (error) {
+      throw new DatabaseError('Database connection test failed', error.message);
+    }
+  }
+
+  /**
    * Execute query with tenant context
    */
   async query(tenantId, sql, params = []) {

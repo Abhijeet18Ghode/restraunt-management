@@ -5,7 +5,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 class TenantService {
   constructor() {
     this.api = axios.create({
-      baseURL: `${API_BASE_URL}/api/tenant`,
+      baseURL: `${API_BASE_URL}/api/tenants`,  // Changed from /api/tenant to /api/tenants
       headers: {
         'Content-Type': 'application/json',
       },

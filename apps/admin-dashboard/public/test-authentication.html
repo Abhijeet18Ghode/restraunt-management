@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Flow Testing</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        .test-section h3 {
+            color: #34495e;
+            margin-top: 0;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .success {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .error {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .warning {
+            color: #f39c12;
+            font-weight: bold;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: white;
+            border-left: 4px solid #3498db;
+        }
+        .result.success {
+            border-left-color: #27ae60;
+            background-color: #d5f4e6;
+        }
+        .result.error {
+            border-left-color: #e74c3c;
+            background-color: #fdf2f2;
+        }
+        .result.warning {
+            border-left-color: #f39c12;
+            background-color: #fef9e7;
+        }
+        .url-box {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            margin: 10px 0;
+        }
+        .url-box a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .url-box a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Authentication Flow Testing</h1>
+        
+        <div class="test-section">
+            <h3>📋 Test Instructions</h3>
+            <p>This test will verify the authentication flow of the admin dashboard:</p>
+            <ol>
+                <li>Check if unauthenticated users are redirected to login</li>
+                <li>Test the login page functionality</li>
+                <li>Verify protected routes are secured</li>
+                <li>Test logout functionality</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h3>🌐 Application URLs</h3>
+            <div class="url-box">
+                <strong>Admin Dashboard:</strong> <a href="http://localhost:3011" target="_blank">http://localhost:3011</a><br>
+                <strong>Login Page:</strong> <a href="http://localhost:3011/login" target="_blank">http://localhost:3011/login</a><br>
+                <strong>Dashboard (Protected):</strong> <a href="http://localhost:3011/dashboard" target="_blank">http://localhost:3011/dashboard</a><br>
+                <strong>Menu Items (Protected):</strong> <a href="http://localhost:3011/menu/items" target="_blank">http://localhost:3011/menu/items</a>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 Authentication Status Check</h3>
+            <button onclick="checkAuthStatus()">Check Current Auth Status</button>
+            <div id="authStatusResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🚪 Route Protection Testing</h3>
+            <button onclick="testRouteProtection()">Test Protected Routes</button>
+            <div id="routeProtectionResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔑 Manual Testing Steps</h3>
+            <div id="manualTestResults">
+                <div class="result warning">
+                    <strong>Step 1:</strong> Open <a href="http://localhost:3011" target="_blank">http://localhost:3011</a> in a new tab
+                    <br><strong>Expected:</strong> Should redirect to /login (not /dashboard)
+                </div>
+                <div class="result warning">
+                    <strong>Step 2:</strong> Try accessing <a href="http://localhost:3011/dashboard" target="_blank">http://localhost:3011/dashboard</a> directly
+                    <br><strong>Expected:</strong> Should redirect to /login
+                </div>
+                <div class="result warning">
+                    <strong>Step 3:</strong> Try accessing <a href="http://localhost:3011/menu/items" target="_blank">http://localhost:3011/menu/items</a> directly
+                    <br><strong>Expected:</strong> Should redirect to /login
+                </div>
+                <div class="result warning">
+                    <strong>Step 4:</strong> Go to login page and check if it loads properly
+                    <br><strong>Expected:</strong> Login form should be visible
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test Results</h3>
+            <button onclick="generateAuthReport()">Generate Authentication Report</button>
+            <div id="authReportResults"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const ADMIN_DASHBOARD_URL = 'http://localhost:3011';
+        
+        let authTestResults = {
+            authStatus: null,
+            routeProtection: {},
+            manualTests: {}
+        };
+
+        // Utility functions
+        function addResult(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            const result = document.createElement('div');
+            result.className = `result ${type}`;
+            result.innerHTML = message;
+            container.appendChild(result);
+        }
+
+        function clearResults(containerId) {
+            document.getElementById(containerId).innerHTML = '';
+        }
+
+        // Check Authentication Status
+        async function checkAuthStatus() {
+            clearResults('authStatusResults');
+            addResult('authStatusResults', '🔍 Checking authentication status...', 'info');
+
+            try {
+                // Check if we can access the main page
+                const response = await fetch(`${ADMIN_DASHBOARD_URL}/`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    redirect: 'manual'
+                });
+
+                addResult('authStatusResults', `📊 Main page response: HTTP ${response.status}`, 'info');
+                
+                if (response.status === 0 || response.type === 'opaqueredirect') {
+                    addResult('authStatusResults', '🔄 Redirect detected (likely to login)', 'warning');
+                } else if (response.status === 200) {
+                    addResult('authStatusResults', '✅ Page loaded successfully', 'success');
+                } else {
+                    addResult('authStatusResults', `⚠️ Unexpected status: ${response.status}`, 'warning');
+                }
+
+                // Check cookies for auth token
+                const cookies = document.cookie;
+                const hasAuthToken = cookies.includes('auth_token');
+                
+                addResult('authStatusResults', `🍪 Auth token present: ${hasAuthToken}`, hasAuthToken ? 'success' : 'warning');
+                
+                authTestResults.authStatus = {
+                    responseStatus: response.status,
+                    hasAuthToken: hasAuthToken,
+                    timestamp: new Date().toISOString()
+                };
+
+            } catch (error) {
+                addResult('authStatusResults', `❌ Auth status check failed: ${error.message}`, 'error');
+                authTestResults.authStatus = { error: error.message };
+            }
+        }
+
+        // Test Route Protection
+        async function testRouteProtection() {
+            clearResults('routeProtectionResults');
+            addResult('routeProtectionResults', '🚪 Testing route protection...', 'info');
+
+            const protectedRoutes = [
+                { name: 'Dashboard', path: '/dashboard' },
+                { name: 'Menu Items', path: '/menu/items' }
+            ];
+
+            for (const route of protectedRoutes) {
+                try {
+                    addResult('routeProtectionResults', `🔍 Testing ${route.name} (${route.path})...`, 'info');
+                    
+                    const response = await fetch(`${ADMIN_DASHBOARD_URL}${route.path}`, {
+                        method: 'GET',
+                        credentials: 'include',
+                        redirect: 'manual'
+                    });
+
+                    let status = 'unknown';
+                    let message = '';
+
+                    if (response.status === 0 || response.type === 'opaqueredirect') {
+                        status = 'protected';
+                        message = '✅ Route is protected (redirects when unauthenticated)';
+                        addResult('routeProtectionResults', `${route.name}: ${message}`, 'success');
+                    } else if (response.status === 200) {
+                        status = 'accessible';
+                        message = '❌ Route is accessible without authentication';
+                        addResult('routeProtectionResults', `${route.name}: ${message}`, 'error');
+                    } else if (response.status === 401 || response.status === 403) {
+                        status = 'protected';
+                        message = '✅ Route returns authentication error';
+                        addResult('routeProtectionResults', `${route.name}: ${message}`, 'success');
+                    } else {
+                        status = 'unknown';
+                        message = `⚠️ Unexpected response: HTTP ${response.status}`;
+                        addResult('routeProtectionResults', `${route.name}: ${message}`, 'warning');
+                    }
+
+                    authTestResults.routeProtection[route.name] = {
+                        path: route.path,
+                        status: status,
+                        httpStatus: response.status,
+                        message: message
+                    };
+
+                } catch (error) {
+                    const message = `❌ Error testing ${route.name}: ${error.message}`;
+                    addResult('routeProtectionResults', message, 'error');
+                    authTestResults.routeProtection[route.name] = {
+                        path: route.path,
+                        status: 'error',
+                        error: error.message
+                    };
+                }
+            }
+        }
+
+        // Generate Authentication Report
+        function generateAuthReport() {
+            clearResults('authReportResults');
+            addResult('authReportResults', '📊 Generating authentication report...', 'info');
+
+            const report = {
+                timestamp: new Date().toISOString(),
+                authStatus: authTestResults.authStatus,
+                routeProtection: authTestResults.routeProtection,
+                summary: {
+                    totalRoutesTested: Object.keys(authTestResults.routeProtection).length,
+                    protectedRoutes: Object.values(authTestResults.routeProtection).filter(r => r.status === 'protected').length,
+                    accessibleRoutes: Object.values(authTestResults.routeProtection).filter(r => r.status === 'accessible').length,
+                    errorRoutes: Object.values(authTestResults.routeProtection).filter(r => r.status === 'error').length
+                }
+            };
+
+            // Display summary
+            addResult('authReportResults', '🎯 Authentication Test Summary:', 'info');
+            addResult('authReportResults', `📊 Routes Tested: ${report.summary.totalRoutesTested}`, 'info');
+            addResult('authReportResults', `✅ Protected Routes: ${report.summary.protectedRoutes}`, 'success');
+            addResult('authReportResults', `❌ Accessible Routes: ${report.summary.accessibleRoutes}`, report.summary.accessibleRoutes === 0 ? 'success' : 'error');
+            addResult('authReportResults', `⚠️ Error Routes: ${report.summary.errorRoutes}`, report.summary.errorRoutes === 0 ? 'success' : 'warning');
+
+            // Overall status
+            const isSecure = report.summary.accessibleRoutes === 0 && report.summary.protectedRoutes > 0;
+            const overallStatus = isSecure ? '🔒 SECURE' : '⚠️ NEEDS ATTENTION';
+            const overallType = isSecure ? 'success' : 'warning';
+            
+            addResult('authReportResults', `🛡️ Overall Security Status: ${overallStatus}`, overallType);
+
+            // Detailed report
+            addResult('authReportResults', '<pre>' + JSON.stringify(report, null, 2) + '</pre>', 'info');
+        }
+
+        // Auto-run auth status check on page load
+        window.addEventListener('load', () => {
+            setTimeout(checkAuthStatus, 1000);
+        });
+    </script>
+</body>
+</html>

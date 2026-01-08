@@ -48,7 +48,7 @@ class ServiceOrchestrator {
 
     try {
       // Check if service directory exists
-      const servicePath = path.resolve(process.cwd(), '../../', config.path);
+      const servicePath = path.resolve(process.cwd(), config.path);
       await fs.access(servicePath);
 
       logger.info(`Starting service: ${serviceName}`);

@@ -12,6 +12,7 @@ const loadBalancer = new LoadBalancer();
 // Service route mappings
 const serviceRoutes = {
   '/api/tenants': 'tenant-service',
+  '/api/auth': 'tenant-service',  // Add auth routes to tenant service
   '/api/menu': 'menu-service',
   '/api/inventory': 'inventory-service',
   '/api/pos': 'pos-service',
@@ -33,29 +34,70 @@ const applyRateLimiting = (req, res, next) => {
   return generalLimiter(req, res, next);
 };
 
+// Service URL cache
+const serviceUrlCache = new Map();
+
+// Initialize service URLs with fallback values
+const initializeServiceUrls = () => {
+  const fallbackUrls = {
+    'tenant-service': 'http://localhost:3001',
+    'menu-service': 'http://localhost:3002',
+    'inventory-service': 'http://localhost:3003',
+    'pos-service': 'http://localhost:3004',
+    'online-order-service': 'http://localhost:3005',
+    'staff-service': 'http://localhost:3006',
+    'customer-service': 'http://localhost:3007',
+    'analytics-service': 'http://localhost:3008',
+    'payment-service': 'http://localhost:3009'
+  };
+  
+  Object.entries(fallbackUrls).forEach(([serviceName, url]) => {
+    serviceUrlCache.set(serviceName, url);
+  });
+};
+
+// Initialize the cache
+initializeServiceUrls();
+
+// Periodically update service URLs from service discovery
+const updateServiceUrls = async () => {
+  for (const serviceName of Object.values(serviceRoutes)) {
+    try {
+      const serviceUrl = await serviceDiscovery.getServiceUrl(serviceName);
+      serviceUrlCache.set(serviceName, serviceUrl);
+    } catch (error) {
+      logger.warn(`Failed to update URL for ${serviceName}:`, error.message);
+    }
+  }
+};
+
+// Update service URLs every 30 seconds
+setInterval(updateServiceUrls, 30000);
+
+// Initial update
+updateServiceUrls().catch(error => {
+  logger.warn('Initial service URL update failed:', error.message);
+});
+
 // Custom proxy middleware with service discovery
 const createServiceProxy = (serviceName) => {
   return createProxyMiddleware({
-    target: 'http://localhost:3001', // Default fallback, will be overridden by router
+    target: serviceUrlCache.get(serviceName) || 'http://localhost:3001',
     changeOrigin: true,
     pathRewrite: (path, req) => {
       // Remove the service prefix from the path
       const servicePrefix = Object.keys(serviceRoutes).find(prefix => path.startsWith(prefix));
       return path.replace(servicePrefix, '');
     },
-    router: async (req) => {
-      try {
-        const serviceUrl = await serviceDiscovery.getServiceUrl(serviceName);
-        logger.debug(`Routing request to ${serviceName}:`, {
-          originalUrl: req.originalUrl,
-          serviceUrl,
-          method: req.method
-        });
-        return serviceUrl;
-      } catch (error) {
-        logger.error(`Failed to route to ${serviceName}:`, error);
-        throw error;
-      }
+    router: (req) => {
+      // Use cached service URL or fallback
+      const serviceUrl = serviceUrlCache.get(serviceName);
+      logger.debug(`Routing request to ${serviceName}:`, {
+        originalUrl: req.originalUrl,
+        serviceUrl,
+        method: req.method
+      });
+      return serviceUrl;
     },
     onError: (err, req, res) => {
       logger.error('Proxy error:', {

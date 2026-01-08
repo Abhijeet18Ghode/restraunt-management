@@ -9,7 +9,8 @@ export default function ProtectedRoute({
   children, 
   requiredPermission = null,
   requiredRole = null,
-  fallbackPath = '/login' 
+  fallbackPath = '/login',
+  resource = null
 }) {
   const { user, loading, isAuthenticated, hasPermission, hasRole } = useAuth();
   const router = useRouter();
@@ -22,12 +23,18 @@ export default function ProtectedRoute({
       }
 
       if (requiredPermission && !hasPermission(requiredPermission)) {
-        router.push('/unauthorized');
+        const params = new URLSearchParams();
+        params.set('permission', requiredPermission);
+        if (resource) params.set('resource', resource);
+        router.push(`/unauthorized?${params.toString()}`);
         return;
       }
 
       if (requiredRole && !hasRole(requiredRole)) {
-        router.push('/unauthorized');
+        const params = new URLSearchParams();
+        params.set('role', requiredRole);
+        if (resource) params.set('resource', resource);
+        router.push(`/unauthorized?${params.toString()}`);
         return;
       }
     }
@@ -40,7 +47,8 @@ export default function ProtectedRoute({
     hasPermission, 
     hasRole, 
     router, 
-    fallbackPath
+    fallbackPath,
+    resource
   ]);
 
   if (loading) {

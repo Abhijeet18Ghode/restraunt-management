@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const staffRoutes = require('./routes/staffRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const performanceRoutes = require('./routes/performanceRoutes');
+const authRoutes = require('./routes/authRoutes');
 const { errorHandler } = require('./middleware/errorHandler');
 const { DatabaseManager } = require('@rms/shared');
 
@@ -13,7 +14,7 @@ const app = express();
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:3011', 'http://localhost:3012'],
   credentials: true,
 }));
 
@@ -45,9 +46,13 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
+app.use('/api/auth', authRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/performance', performanceRoutes);
+
+// Handle API Gateway routing (path prefix stripped)
+app.use('/', authRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

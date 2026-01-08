@@ -1,444 +1,257 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTenant } from '../../contexts/TenantContext';
-import { menuService } from '../../services/menuService';
 import DashboardLayout from '../../components/Layout/DashboardLayout';
 import ProtectedRoute from '../../components/Auth/ProtectedRoute';
+import PermissionGate from '../../components/Auth/PermissionGate';
+import { useRoleManager } from '../../components/Auth/RoleManager';
 import Card from '../../components/UI/Card';
 import Button from '../../components/UI/Button';
-import Modal from '../../components/UI/Modal';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
-import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
-import toast, { Toaster } from 'react-hot-toast';
+import { menuService } from '../../services/menuService';
+import { useTenant } from '../../contexts/TenantContext';
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  DollarSign,
+  Package,
+  AlertCircle,
+} from 'lucide-react';
 
-export default function MenuItemsPage() {
+function MenuItemsContent() {
   const [menuItems, setMenuItems] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editingItem, setEditingItem] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState('all');
   const { selectedOutlet } = useTenant();
-
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    price: '',
-    categoryId: '',
-    available: true,
-    ingredients: '',
-    allergens: '',
-    preparationTime: '',
-  });
+  const { PERMISSIONS, canAccessFeature } = useRoleManager();
 
   useEffect(() => {
     if (selectedOutlet) {
-      loadData();
+      loadMenuItems();
     }
   }, [selectedOutlet]);
 
-  const loadData = async () => {
+  const loadMenuItems = async () => {
     try {
       setLoading(true);
-      const [itemsData, categoriesData] = await Promise.all([
-        menuService.getMenuItems(selectedOutlet.id),
-        menuService.getCategories(selectedOutlet.id),
-      ]);
-      setMenuItems(itemsData);
-      setCategories(categoriesData);
+      const data = await menuService.getMenuItems(selectedOutlet.id);
+      setMenuItems(data);
     } catch (error) {
-      console.error('Failed to load menu data:', error);
-      toast.error('Failed to load menu data');
+      console.error('Failed to load menu items:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      const itemData = {
-        ...formData,
-        outletId: selectedOutlet.id,
-        price: parseFloat(formData.price),
-        preparationTime: parseInt(formData.preparationTime) || 0,
-        ingredients: formData.ingredients.split(',').map(i => i.trim()).filter(Boolean),
-        allergens: formData.allergens.split(',').map(a => a.trim()).filter(Boolean),
-      };
-
-      if (editingItem) {
-        await menuService.updateMenuItem(editingItem.id, itemData);
-        toast.success('Menu item updated successfully');
-      } else {
-        await menuService.createMenuItem(itemData);
-        toast.success('Menu item created successfully');
-      }
-
-      setShowModal(false);
-      resetForm();
-      loadData();
-    } catch (error) {
-      console.error('Failed to save menu item:', error);
-      toast.error('Failed to save menu item');
-    }
-  };
-
-  const handleEdit = (item) => {
-    setEditingItem(item);
-    setFormData({
-      name: item.name,
-      description: item.description || '',
-      price: item.price.toString(),
-      categoryId: item.categoryId,
-      available: item.available,
-      ingredients: item.ingredients?.join(', ') || '',
-      allergens: item.allergens?.join(', ') || '',
-      preparationTime: item.preparationTime?.toString() || '',
-    });
-    setShowModal(true);
-  };
-
-  const handleDelete = async (item) => {
-    if (!confirm(`Are you sure you want to delete "${item.name}"?`)) {
-      return;
-    }
-
-    try {
-      await menuService.deleteMenuItem(item.id);
-      toast.success('Menu item deleted successfully');
-      loadData();
-    } catch (error) {
-      console.error('Failed to delete menu item:', error);
-      toast.error('Failed to delete menu item');
-    }
-  };
-
-  const toggleAvailability = async (item) => {
-    try {
-      await menuService.updateItemAvailability(item.id, !item.available);
-      toast.success(`${item.name} ${!item.available ? 'enabled' : 'disabled'}`);
-      loadData();
-    } catch (error) {
-      console.error('Failed to update availability:', error);
-      toast.error('Failed to update availability');
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      price: '',
-      categoryId: '',
-      available: true,
-      ingredients: '',
-      allergens: '',
-      preparationTime: '',
-    });
-    setEditingItem(null);
-  };
-
-  const filteredItems = selectedCategory === 'all' 
-    ? menuItems 
-    : menuItems.filter(item => item.categoryId === selectedCategory);
-
-  const getCategoryName = (categoryId) => {
-    const category = categories.find(c => c.id === categoryId);
-    return category?.name || 'Unknown Category';
-  };
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <LoadingSpinner size="lg" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
-    <ProtectedRoute requiredPermission="menu.view">
-      <DashboardLayout>
-        <Toaster position="top-right" />
-        
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Menu Items</h1>
-              <p className="mt-1 text-sm text-gray-500">
-                Manage your menu items for {selectedOutlet?.name}
-              </p>
-            </div>
-            
-            <Button
-              onClick={() => {
-                resetForm();
-                setShowModal(true);
-              }}
-              className="flex items-center"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Item
-            </Button>
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Menu Items</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Manage your restaurant's menu items and pricing
+            </p>
           </div>
-
-          {/* Filters */}
-          <Card className="p-4">
-            <div className="flex items-center space-x-4">
-              <label className="text-sm font-medium text-gray-700">
-                Filter by Category:
-              </label>
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="input w-auto"
-              >
-                <option value="all">All Categories</option>
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </Card>
-
-          {/* Menu Items */}
-          {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <LoadingSpinner size="lg" />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredItems.map(item => (
-                <Card key={item.id} className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-medium text-gray-900">
-                        {item.name}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {getCategoryName(item.categoryId)}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => toggleAvailability(item)}
-                        className={`p-1 rounded ${
-                          item.available 
-                            ? 'text-green-600 hover:bg-green-50' 
-                            : 'text-gray-400 hover:bg-gray-50'
-                        }`}
-                        title={item.available ? 'Available' : 'Unavailable'}
-                      >
-                        {item.available ? (
-                          <Eye className="h-4 w-4" />
-                        ) : (
-                          <EyeOff className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {item.description && (
-                    <p className="text-sm text-gray-600 mb-4">
-                      {item.description}
-                    </p>
-                  )}
-
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xl font-bold text-primary-600">
-                      ${item.price.toFixed(2)}
-                    </span>
-                    {item.preparationTime && (
-                      <span className="text-sm text-gray-500">
-                        {item.preparationTime} min
-                      </span>
-                    )}
-                  </div>
-
-                  {item.ingredients && item.ingredients.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs font-medium text-gray-700 mb-1">
-                        Ingredients:
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        {item.ingredients.join(', ')}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-end space-x-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleEdit(item)}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      onClick={() => handleDelete(item)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-
-          {!loading && filteredItems.length === 0 && (
-            <Card className="p-12 text-center">
-              <p className="text-gray-500">
-                No menu items found. 
-                {selectedCategory !== 'all' ? ' Try selecting a different category.' : ''}
-              </p>
-            </Card>
-          )}
+          
+          {/* Create button - only show if user has permission */}
+          <PermissionGate permission={PERMISSIONS.MENU_ITEMS_MANAGE}>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Menu Item
+            </Button>
+          </PermissionGate>
         </div>
 
-        {/* Add/Edit Modal */}
-        <Modal
-          isOpen={showModal}
-          onClose={() => {
-            setShowModal(false);
-            resetForm();
-          }}
-          title={editingItem ? 'Edit Menu Item' : 'Add Menu Item'}
-          size="lg"
-        >
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Bulk operations - only for managers and admins */}
+        <PermissionGate permission={PERMISSIONS.MENU_BULK_MANAGE}>
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="input"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                />
+                <h3 className="text-lg font-medium text-gray-900">Bulk Operations</h3>
+                <p className="text-sm text-gray-500">
+                  Perform operations on multiple menu items at once
+                </p>
+              </div>
+              <div className="flex space-x-2">
+                <Button variant="outline" size="sm">
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Bulk Price Update
+                </Button>
+                <Button variant="outline" size="sm">
+                  <Package className="h-4 w-4 mr-2" />
+                  Update Availability
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </PermissionGate>
+
+        {/* Menu Items Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {menuItems.map((item) => (
+            <Card key={item.id} className="p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <h3 className="text-lg font-medium text-gray-900">{item.name}</h3>
+                  <p className="text-sm text-gray-500 mt-1">{item.category}</p>
+                  <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                    {item.description}
+                  </p>
+                </div>
+                {item.image && (
+                  <img 
+                    src={item.image} 
+                    alt={item.name}
+                    className="w-16 h-16 object-cover rounded-lg ml-4"
+                  />
+                )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category *
-                </label>
-                <select
-                  required
-                  className="input"
-                  value={formData.categoryId}
-                  onChange={(e) => setFormData(prev => ({ ...prev, categoryId: e.target.value }))}
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-lg font-semibold text-gray-900">
+                  ${item.price.toFixed(2)}
+                </div>
+                <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  item.isAvailable 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-red-100 text-red-800'
+                }`}>
+                  {item.isAvailable ? 'Available' : 'Unavailable'}
+                </div>
+              </div>
+
+              {/* Low stock warning - only show if user can view inventory */}
+              <PermissionGate permission={PERMISSIONS.INVENTORY_VIEW}>
+                {item.lowStock && (
+                  <div className="flex items-center text-yellow-600 text-sm mb-4">
+                    <AlertCircle className="h-4 w-4 mr-1" />
+                    Low stock warning
+                  </div>
+                )}
+              </PermissionGate>
+
+              {/* Action buttons based on permissions */}
+              <div className="flex space-x-2">
+                {/* View button - everyone can view */}
+                <Button variant="outline" size="sm" className="flex-1">
+                  <Eye className="h-4 w-4 mr-1" />
+                  View
+                </Button>
+
+                {/* Edit button - only if user can manage items */}
+                <PermissionGate permission={PERMISSIONS.MENU_ITEMS_MANAGE}>
+                  <Button variant="outline" size="sm" className="flex-1">
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                </PermissionGate>
+
+                {/* Delete button - only for admins and managers */}
+                <PermissionGate 
+                  permission={PERMISSIONS.MENU_ITEMS_MANAGE}
+                  role={['admin', 'manager']}
                 >
-                  <option value="">Select Category</option>
-                  {categories.map(category => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
+                  <Button variant="danger" size="sm">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </PermissionGate>
               </div>
-            </div>
+            </Card>
+          ))}
+        </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                className="input"
-                rows={3}
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Price ($) *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  required
-                  className="input"
-                  value={formData.price}
-                  onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Preparation Time (minutes)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  className="input"
-                  value={formData.preparationTime}
-                  onChange={(e) => setFormData(prev => ({ ...prev, preparationTime: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Ingredients (comma-separated)
-              </label>
-              <input
-                type="text"
-                className="input"
-                placeholder="e.g., tomato, cheese, basil"
-                value={formData.ingredients}
-                onChange={(e) => setFormData(prev => ({ ...prev, ingredients: e.target.value }))}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Allergens (comma-separated)
-              </label>
-              <input
-                type="text"
-                className="input"
-                placeholder="e.g., dairy, gluten, nuts"
-                value={formData.allergens}
-                onChange={(e) => setFormData(prev => ({ ...prev, allergens: e.target.value }))}
-              />
-            </div>
-
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="available"
-                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                checked={formData.available}
-                onChange={(e) => setFormData(prev => ({ ...prev, available: e.target.checked }))}
-              />
-              <label htmlFor="available" className="ml-2 block text-sm text-gray-900">
-                Available for ordering
-              </label>
-            </div>
-
-            <div className="flex justify-end space-x-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowModal(false);
-                  resetForm();
-                }}
-              >
-                Cancel
+        {/* Empty state */}
+        {menuItems.length === 0 && (
+          <Card className="p-12 text-center">
+            <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No menu items found
+            </h3>
+            <p className="text-gray-500 mb-6">
+              Get started by adding your first menu item.
+            </p>
+            <PermissionGate permission={PERMISSIONS.MENU_ITEMS_MANAGE}>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Menu Item
               </Button>
-              <Button type="submit">
-                {editingItem ? 'Update Item' : 'Create Item'}
-              </Button>
+            </PermissionGate>
+          </Card>
+        )}
+
+        {/* Permission-based feature showcase */}
+        <Card className="p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Feature Access Based on Your Role
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <div className={`w-3 h-3 rounded-full mr-2 ${
+                  canAccessFeature(PERMISSIONS.MENU_ITEMS_MANAGE) ? 'bg-green-500' : 'bg-red-500'
+                }`} />
+                <span>Create/Edit Menu Items</span>
+              </div>
+              <div className="flex items-center">
+                <div className={`w-3 h-3 rounded-full mr-2 ${
+                  canAccessFeature(PERMISSIONS.MENU_PRICING_MANAGE) ? 'bg-green-500' : 'bg-red-500'
+                }`} />
+                <span>Manage Pricing</span>
+              </div>
+              <div className="flex items-center">
+                <div className={`w-3 h-3 rounded-full mr-2 ${
+                  canAccessFeature(PERMISSIONS.MENU_BULK_MANAGE) ? 'bg-green-500' : 'bg-red-500'
+                }`} />
+                <span>Bulk Operations</span>
+              </div>
             </div>
-          </form>
-        </Modal>
-      </DashboardLayout>
+            <div className="space-y-2">
+              <div className="flex items-center">
+                <div className={`w-3 h-3 rounded-full mr-2 ${
+                  canAccessFeature(PERMISSIONS.INVENTORY_VIEW) ? 'bg-green-500' : 'bg-red-500'
+                }`} />
+                <span>View Inventory Status</span>
+              </div>
+              <div className="flex items-center">
+                <div className={`w-3 h-3 rounded-full mr-2 ${
+                  canAccessFeature(PERMISSIONS.ANALYTICS_VIEW) ? 'bg-green-500' : 'bg-red-500'
+                }`} />
+                <span>View Analytics</span>
+              </div>
+              <div className="flex items-center">
+                <div className={`w-3 h-3 rounded-full mr-2 ${
+                  canAccessFeature(null, ['admin', 'manager']) ? 'bg-green-500' : 'bg-red-500'
+                }`} />
+                <span>Advanced Management</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </DashboardLayout>
+  );
+}
+
+export default function MenuItemsPage() {
+  return (
+    <ProtectedRoute 
+      requiredPermission="menu.items.view"
+      resource="menu items management"
+    >
+      <MenuItemsContent />
     </ProtectedRoute>
   );
 }

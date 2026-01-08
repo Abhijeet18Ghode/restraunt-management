@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '../../contexts/AuthContext';
 import { useTenant } from '../../contexts/TenantContext';
+import { useFilteredNavigation } from '../Auth/RoleBasedNavigation';
 import {
   LayoutDashboard,
   Store,
@@ -18,7 +18,8 @@ import {
   Package,
   CreditCard,
   UserCheck,
-  MessageSquare,
+  Bell,
+  FileText,
 } from 'lucide-react';
 
 const navigation = [
@@ -33,72 +34,256 @@ const navigation = [
     href: '/outlets',
     icon: Building2,
     permission: 'outlets.view',
+    roles: ['admin', 'manager'],
   },
   {
     name: 'Menu Management',
     icon: Menu,
     permission: 'menu.view',
+    hideIfNoChildren: true,
     children: [
-      { name: 'Categories', href: '/menu/categories' },
-      { name: 'Items', href: '/menu/items' },
-      { name: 'Pricing', href: '/menu/pricing' },
+      { 
+        name: 'Menu Management', 
+        href: '/menu/management',
+        permission: 'menu.categories.manage'
+      },
+      { 
+        name: 'Categories', 
+        href: '/menu/categories',
+        permission: 'menu.categories.view'
+      },
+      { 
+        name: 'Items', 
+        href: '/menu/items',
+        permission: 'menu.items.view'
+      },
+      { 
+        name: 'Pricing', 
+        href: '/menu/pricing',
+        permission: 'menu.pricing.view',
+        roles: ['admin', 'manager']
+      },
+      { 
+        name: 'Bulk Operations', 
+        href: '/menu/bulk',
+        permission: 'menu.bulk.manage',
+        roles: ['admin', 'manager']
+      },
     ],
   },
   {
     name: 'Inventory',
-    href: '/inventory',
     icon: Package,
     permission: 'inventory.view',
+    hideIfNoChildren: true,
+    children: [
+      { 
+        name: 'Stock Levels', 
+        href: '/inventory',
+        permission: 'inventory.view'
+      },
+      { 
+        name: 'Suppliers', 
+        href: '/inventory/suppliers',
+        permission: 'inventory.suppliers.view',
+        roles: ['admin', 'manager', 'inventory_manager']
+      },
+      { 
+        name: 'Purchase Orders', 
+        href: '/inventory/purchase-orders',
+        permission: 'inventory.purchase_orders.view',
+        roles: ['admin', 'manager', 'inventory_manager']
+      },
+      { 
+        name: 'Stock Transfers', 
+        href: '/inventory/transfers',
+        permission: 'inventory.transfers.view',
+        roles: ['admin', 'manager']
+      },
+    ],
   },
   {
     name: 'Staff Management',
     icon: Users,
     permission: 'staff.view',
+    roles: ['admin', 'manager'],
+    hideIfNoChildren: true,
     children: [
-      { name: 'Staff List', href: '/staff' },
-      { name: 'Attendance', href: '/staff/attendance' },
-      { name: 'Performance', href: '/staff/performance' },
+      { 
+        name: 'Staff List', 
+        href: '/staff',
+        permission: 'staff.view'
+      },
+      { 
+        name: 'Attendance', 
+        href: '/staff/attendance',
+        permission: 'staff.attendance.view'
+      },
+      { 
+        name: 'Performance', 
+        href: '/staff/performance',
+        permission: 'staff.performance.view',
+        roles: ['admin', 'manager']
+      },
+      { 
+        name: 'Schedules', 
+        href: '/staff/schedules',
+        permission: 'staff.schedules.manage',
+        roles: ['admin', 'manager']
+      },
+      { 
+        name: 'Payroll', 
+        href: '/staff/payroll',
+        permission: 'staff.payroll.view',
+        roles: ['admin']
+      },
     ],
   },
   {
     name: 'Customers',
     icon: UserCheck,
     permission: 'customers.view',
+    hideIfNoChildren: true,
     children: [
-      { name: 'Customer List', href: '/customers' },
-      { name: 'Loyalty Program', href: '/customers/loyalty' },
-      { name: 'Feedback', href: '/customers/feedback' },
+      { 
+        name: 'Customer List', 
+        href: '/customers',
+        permission: 'customers.view'
+      },
+      { 
+        name: 'Loyalty Program', 
+        href: '/customers/loyalty',
+        permission: 'customers.loyalty.manage',
+        roles: ['admin', 'manager']
+      },
+      { 
+        name: 'Feedback', 
+        href: '/customers/feedback',
+        permission: 'customers.feedback.view'
+      },
+      { 
+        name: 'Marketing', 
+        href: '/customers/marketing',
+        permission: 'customers.marketing.manage',
+        roles: ['admin', 'manager']
+      },
     ],
   },
   {
     name: 'Analytics',
     icon: BarChart3,
     permission: 'analytics.view',
+    hideIfNoChildren: true,
     children: [
-      { name: 'Sales Reports', href: '/analytics/sales' },
-      { name: 'Performance', href: '/analytics/performance' },
-      { name: 'Trends', href: '/analytics/trends' },
+      { 
+        name: 'Sales Reports', 
+        href: '/analytics/sales',
+        permission: 'analytics.sales.view'
+      },
+      { 
+        name: 'Performance', 
+        href: '/analytics/performance',
+        permission: 'analytics.performance.view',
+        roles: ['admin', 'manager']
+      },
+      { 
+        name: 'Trends', 
+        href: '/analytics/trends',
+        permission: 'analytics.trends.view',
+        roles: ['admin', 'manager']
+      },
+      { 
+        name: 'Financial Reports', 
+        href: '/analytics/financial',
+        permission: 'analytics.financial.view',
+        roles: ['admin']
+      },
+      { 
+        name: 'Export Data', 
+        href: '/analytics/export',
+        permission: 'analytics.export',
+        roles: ['admin', 'manager']
+      },
     ],
   },
   {
     name: 'Payments',
-    href: '/payments',
     icon: CreditCard,
     permission: 'payments.view',
+    hideIfNoChildren: true,
+    children: [
+      { 
+        name: 'Transactions', 
+        href: '/payments',
+        permission: 'payments.view'
+      },
+      { 
+        name: 'Refunds', 
+        href: '/payments/refunds',
+        permission: 'payments.refunds.manage',
+        roles: ['admin', 'manager']
+      },
+      { 
+        name: 'Settlement', 
+        href: '/payments/settlement',
+        permission: 'payments.settlement.view',
+        roles: ['admin', 'manager']
+      },
+    ],
+  },
+  {
+    name: 'Notifications',
+    href: '/notifications',
+    icon: Bell,
+    permission: 'notifications.view',
+  },
+  {
+    name: 'Reports',
+    href: '/reports',
+    icon: FileText,
+    permission: 'reports.view',
+    roles: ['admin', 'manager'],
   },
   {
     name: 'Settings',
-    href: '/settings',
     icon: Settings,
     permission: 'settings.view',
+    hideIfNoChildren: true,
+    children: [
+      { 
+        name: 'General', 
+        href: '/settings',
+        permission: 'settings.general.view'
+      },
+      { 
+        name: 'Security', 
+        href: '/settings/security',
+        permission: 'settings.security.manage',
+        roles: ['admin']
+      },
+      { 
+        name: 'Integrations', 
+        href: '/settings/integrations',
+        permission: 'settings.integrations.manage',
+        roles: ['admin', 'manager']
+      },
+      { 
+        name: 'Backup', 
+        href: '/settings/backup',
+        permission: 'settings.backup.manage',
+        roles: ['admin']
+      },
+    ],
   },
 ];
 
 export default function Sidebar({ isOpen, onClose }) {
   const [expandedItems, setExpandedItems] = useState({});
   const pathname = usePathname();
-  const { hasPermission } = useAuth();
   const { selectedOutlet } = useTenant();
+
+  // Use the filtered navigation based on user permissions
+  const filteredNavigation = useFilteredNavigation(navigation);
 
   const toggleExpanded = (itemName) => {
     setExpandedItems(prev => ({
@@ -114,10 +299,6 @@ export default function Sidebar({ isOpen, onClose }) {
   const isParentActive = (children) => {
     return children?.some(child => isActive(child.href));
   };
-
-  const filteredNavigation = navigation.filter(item => 
-    !item.permission || hasPermission(item.permission)
-  );
 
   return (
     <>

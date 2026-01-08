@@ -59,8 +59,8 @@ class AnalyticsService {
     return response.data;
   }
 
-  async getDashboardSummary(outletId) {
-    const response = await this.api.get(`/dashboard-summary?outletId=${outletId}`);
+  async getDashboardSummary(outletId, period = '7d') {
+    const response = await this.api.get(`/dashboard-summary?outletId=${outletId}&period=${period}`);
     return response.data;
   }
 

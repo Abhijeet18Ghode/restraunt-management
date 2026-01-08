@@ -6,21 +6,40 @@ const logger = require('../utils/logger');
 class NotificationService {
   constructor() {
     // Email configuration
-    this.emailTransporter = nodemailer.createTransporter({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: process.env.SMTP_PORT || 587,
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
-    });
+    try {
+      this.emailTransporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: process.env.SMTP_PORT || 587,
+        secure: false,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        }
+      });
+      console.log('Email transporter initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize email transporter:', error.message);
+      this.emailTransporter = null;
+    }
 
-    // SMS configuration
-    this.smsClient = twilio(
-      process.env.TWILIO_ACCOUNT_SID,
-      process.env.TWILIO_AUTH_TOKEN
-    );
+    // SMS configuration (only initialize if credentials are provided)
+    try {
+      if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && 
+          process.env.TWILIO_ACCOUNT_SID !== 'AC6bebf583a645194204b32f3286d59ebc' &&
+          process.env.TWILIO_AUTH_TOKEN !== 'c56278c8dd5efc02b4ed8531425f8e49') {
+        this.smsClient = twilio(
+          process.env.TWILIO_ACCOUNT_SID,
+          process.env.TWILIO_AUTH_TOKEN
+        );
+        console.log('Twilio SMS client initialized successfully');
+      } else {
+        console.warn('Twilio credentials not provided or using placeholder values. SMS functionality will be disabled.');
+        this.smsClient = null;
+      }
+    } catch (error) {
+      console.error('Failed to initialize Twilio client:', error.message);
+      this.smsClient = null;
+    }
 
     // Push notification configuration (Firebase)
     this.pushConfig = {
@@ -68,6 +87,7 @@ class NotificationService {
           template: 'staff-schedule'
         },
         sms: 'Schedule reminder: You are scheduled to work #{shift} on #{date}.'
+      }
     };
   }
 
@@ -195,8 +215,8 @@ class NotificationService {
 
   async sendSMS(to, templateType, data) {
     try {
-      if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-        throw new Error('Twilio credentials not configured');
+      if (!this.smsClient) {
+        throw new Error('SMS service not available - Twilio credentials not configured or invalid');
       }
 
       const template = this.templates[templateType]?.sms;

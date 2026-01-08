@@ -316,8 +316,8 @@ const setupGlobalErrorHandlers = () => {
       timestamp: new Date().toISOString()
     });
     
-    // Graceful shutdown
-    process.exit(1);
+    // Don't exit immediately, just log the error
+    logger.warn('Continuing despite uncaught exception');
   });
 
   process.on('unhandledRejection', (reason, promise) => {
@@ -328,8 +328,8 @@ const setupGlobalErrorHandlers = () => {
       timestamp: new Date().toISOString()
     });
     
-    // Graceful shutdown
-    process.exit(1);
+    // Don't exit immediately, just log the error
+    logger.warn('Continuing despite unhandled rejection');
   });
 };
 

@@ -22,7 +22,7 @@ class TenantService {
    * Create a new tenant
    */
   async createTenant(tenantData) {
-    const { businessName, contactInfo, subscriptionPlan = 'BASIC', adminUser } = tenantData;
+    const { businessName, subscriptionPlan = 'BASIC' } = tenantData;
     
     // Validate subscription plan
     if (!Object.values(SUBSCRIPTION_PLANS).includes(subscriptionPlan)) {
@@ -39,40 +39,32 @@ class TenantService {
       try {
         await client.query('BEGIN');
 
-        // Create tenant registry entry
+        // Create tenant registry entry (simplified for current schema)
         await client.query(`
           INSERT INTO tenant_registry (
             tenant_id, business_name, schema_name, subscription_plan, 
-            contact_info, is_active, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+            is_active, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
         `, [
           tenantId,
           businessName,
           schemaName,
           subscriptionPlan,
-          JSON.stringify(contactInfo),
           true
         ]);
 
         // Create tenant schema and tables
         await this.db.createTenantSchema(tenantId);
 
-        // Create admin user if provided
-        let adminUserId = null;
-        if (adminUser) {
-          adminUserId = await this.createTenantAdmin(tenantId, adminUser);
-        }
-
         await client.query('COMMIT');
 
         const tenant = {
           id: tenantId,
+          tenantId: tenantId,
           businessName,
-          contactInfo,
-          subscriptionPlan,
           schemaName,
+          subscriptionPlan,
           isActive: true,
-          adminUserId,
           createdAt: new Date().toISOString(),
         };
 
@@ -104,11 +96,11 @@ class TenantService {
     try {
       const result = await this.db.systemQuery(`
         SELECT 
+          id,
           tenant_id,
           business_name,
-          contact_info,
-          subscription_plan,
           schema_name,
+          subscription_plan,
           is_active,
           created_at,
           updated_at
@@ -121,11 +113,11 @@ class TenantService {
       }
 
       const tenant = {
-        id: result.rows[0].tenant_id,
+        id: result.rows[0].id,
+        tenantId: result.rows[0].tenant_id,
         businessName: result.rows[0].business_name,
-        contactInfo: result.rows[0].contact_info,
-        subscriptionPlan: result.rows[0].subscription_plan,
         schemaName: result.rows[0].schema_name,
+        subscriptionPlan: result.rows[0].subscription_plan,
         isActive: result.rows[0].is_active,
         createdAt: result.rows[0].created_at,
         updatedAt: result.rows[0].updated_at,
@@ -243,27 +235,30 @@ class TenantService {
     try {
       const offset = (page - 1) * limit;
       let whereClause = '';
-      const queryParams = [limit, offset];
+      let countParams = [];
+      let queryParams = [];
 
       if (isActive !== null) {
-        whereClause = 'WHERE is_active = $3';
-        queryParams.push(isActive);
+        whereClause = 'WHERE is_active = $1';
+        countParams = [isActive];
+        queryParams = [isActive, limit, offset];
+      } else {
+        queryParams = [limit, offset];
       }
 
       // Get total count
       const countQuery = `SELECT COUNT(*) FROM tenant_registry ${whereClause}`;
-      const countResult = await this.db.systemQuery(
-        countQuery, 
-        isActive !== null ? [isActive] : []
-      );
+      const countResult = await this.db.systemQuery(countQuery, countParams);
       const total = parseInt(countResult.rows[0].count);
 
-      // Get tenants
+      // Get tenants - using actual database columns
+      const paramOffset = isActive !== null ? 2 : 0;
       const query = `
         SELECT 
+          id,
           tenant_id,
           business_name,
-          contact_info,
+          schema_name,
           subscription_plan,
           is_active,
           created_at,
@@ -271,15 +266,16 @@ class TenantService {
         FROM tenant_registry 
         ${whereClause}
         ORDER BY created_at DESC
-        LIMIT $1 OFFSET $2
+        LIMIT $${paramOffset + 1} OFFSET $${paramOffset + 2}
       `;
 
       const result = await this.db.systemQuery(query, queryParams);
 
       const tenants = result.rows.map(row => ({
-        id: row.tenant_id,
+        id: row.id,
+        tenantId: row.tenant_id,
         businessName: row.business_name,
-        contactInfo: row.contact_info,
+        schemaName: row.schema_name,
         subscriptionPlan: row.subscription_plan,
         isActive: row.is_active,
         createdAt: row.created_at,

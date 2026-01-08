@@ -39,7 +39,16 @@ class SystemManager {
 
     try {
       const servicePath = path.resolve(process.cwd(), config.path);
-      await fs.access(path.join(servicePath, 'src/app.js'));
+      // Determine the start file to check
+      let startFile;
+      if (config.startFile) {
+        startFile = config.startFile;
+      } else if (serviceName === 'api-gateway') {
+        startFile = 'src/robust-app.js';
+      } else {
+        startFile = 'src/app.js';
+      }
+      await fs.access(path.join(servicePath, startFile));
       return true;
     } catch {
       return false;
@@ -81,7 +90,17 @@ class SystemManager {
       const isWindows = process.platform === 'win32';
       const nodeCommand = isWindows ? 'node.exe' : 'node';
       
-      const serviceProcess = spawn(nodeCommand, ['src/app.js'], {
+      // Determine the start file based on service configuration
+      let startFile;
+      if (config.startFile) {
+        startFile = config.startFile;
+      } else if (serviceName === 'api-gateway') {
+        startFile = 'src/robust-app.js';
+      } else {
+        startFile = 'src/app.js';
+      }
+      
+      const serviceProcess = spawn(nodeCommand, [startFile], {
         cwd: servicePath,
         env,
         stdio: ['pipe', 'pipe', 'pipe'],

@@ -4,9 +4,9 @@
   "description": "API Gateway for Restaurant Management System",
   "main": "src/app.js",
   "scripts": {
-    "start": "node src/simple-app.js",
+    "start": "node src/robust-app.js",
     "start:full": "node src/app.js",
-    "dev": "nodemon src/simple-app.js",
+    "dev": "nodemon src/robust-app.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:integration": "jest tests/integration --testTimeout=60000"

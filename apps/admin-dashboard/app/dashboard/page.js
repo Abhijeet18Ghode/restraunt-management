@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTenant } from '../contexts/TenantContext';
+import { useAuth } from '../contexts/AuthContext';
 import { analyticsService } from '../services/analyticsService';
+import websocketService from '../services/websocketService';
 import DashboardLayout from '../components/Layout/DashboardLayout';
+import ProtectedRoute from '../components/Auth/ProtectedRoute';
 import Card from '../components/UI/Card';
 import SalesChart from '../components/Charts/SalesChart';
 import PieChart from '../components/Charts/PieChart';
@@ -15,13 +18,103 @@ import {
   TrendingUp,
   Package,
   AlertTriangle,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 
-export default function DashboardPage() {
+function DashboardContent() {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('7d');
-  const { selectedOutlet } = useTenant();
+  const [isRealTimeConnected, setIsRealTimeConnected] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const { selectedOutlet, currentTenant } = useTenant();
+  const { user } = useAuth();
+
+  // Real-time update handlers
+  const handleSalesUpdate = useCallback((data) => {
+    setDashboardData(prev => prev ? {
+      ...prev,
+      revenue: { ...prev.revenue, ...data.revenue },
+      salesChart: data.salesChart || prev.salesChart
+    } : null);
+    setLastUpdated(new Date());
+  }, []);
+
+  const handleOrderMetricsUpdate = useCallback((data) => {
+    setDashboardData(prev => prev ? {
+      ...prev,
+      orders: { ...prev.orders, ...data.orders },
+      averageOrderValue: data.averageOrderValue || prev.averageOrderValue,
+      recentOrders: data.recentOrders || prev.recentOrders
+    } : null);
+    setLastUpdated(new Date());
+  }, []);
+
+  const handleInventoryUpdate = useCallback((data) => {
+    setDashboardData(prev => prev ? {
+      ...prev,
+      lowStockItems: data.lowStockItems || prev.lowStockItems
+    } : null);
+    setLastUpdated(new Date());
+  }, []);
+
+  const handleNewOrder = useCallback((orderData) => {
+    setDashboardData(prev => {
+      if (!prev) return null;
+      
+      const updatedRecentOrders = [orderData, ...(prev.recentOrders || [])].slice(0, 5);
+      const updatedOrdersToday = (prev.orders?.today || 0) + 1;
+      
+      return {
+        ...prev,
+        orders: {
+          ...prev.orders,
+          today: updatedOrdersToday
+        },
+        recentOrders: updatedRecentOrders
+      };
+    });
+    setLastUpdated(new Date());
+  }, []);
+
+  const handleConnectionStatus = useCallback((status) => {
+    setIsRealTimeConnected(status.status === 'connected');
+  }, []);
+
+  // Initialize real-time connection
+  useEffect(() => {
+    if (selectedOutlet && currentTenant && user) {
+      // Connect to WebSocket
+      websocketService.connect(currentTenant.id, user.id);
+      
+      // Subscribe to real-time events
+      websocketService.on('connection', handleConnectionStatus);
+      websocketService.on('salesUpdate', handleSalesUpdate);
+      websocketService.on('orderMetricsUpdate', handleOrderMetricsUpdate);
+      websocketService.on('stockUpdated', handleInventoryUpdate);
+      websocketService.on('lowStockAlert', handleInventoryUpdate);
+      websocketService.on('newOrder', handleNewOrder);
+
+      // Subscribe to relevant data streams
+      websocketService.subscribeToAnalytics([selectedOutlet.id]);
+      websocketService.subscribeToOrders([selectedOutlet.id]);
+      websocketService.subscribeToInventory([selectedOutlet.id]);
+      
+      // Start heartbeat
+      websocketService.startHeartbeat();
+
+      return () => {
+        // Cleanup event listeners
+        websocketService.off('connection', handleConnectionStatus);
+        websocketService.off('salesUpdate', handleSalesUpdate);
+        websocketService.off('orderMetricsUpdate', handleOrderMetricsUpdate);
+        websocketService.off('stockUpdated', handleInventoryUpdate);
+        websocketService.off('lowStockAlert', handleInventoryUpdate);
+        websocketService.off('newOrder', handleNewOrder);
+      };
+    }
+  }, [selectedOutlet, currentTenant, user, handleConnectionStatus, handleSalesUpdate, handleOrderMetricsUpdate, handleInventoryUpdate, handleNewOrder]);
 
   useEffect(() => {
     if (selectedOutlet) {
@@ -32,14 +125,28 @@ export default function DashboardPage() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const data = await analyticsService.getDashboardSummary(selectedOutlet.id);
+      const data = await analyticsService.getDashboardSummary(selectedOutlet.id, period);
       setDashboardData(data);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Auto-refresh dashboard data every 5 minutes as fallback
+  useEffect(() => {
+    if (!selectedOutlet) return;
+    
+    const interval = setInterval(() => {
+      if (!isRealTimeConnected) {
+        loadDashboardData();
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [selectedOutlet, isRealTimeConnected]);
 
   if (loading) {
     return (
@@ -105,6 +212,26 @@ export default function DashboardPage() {
           </div>
           
           <div className="flex items-center space-x-4">
+            {/* Real-time connection indicator */}
+            <div className="flex items-center space-x-2">
+              {isRealTimeConnected ? (
+                <>
+                  <Wifi className="h-4 w-4 text-green-500" />
+                  <span className="text-sm text-green-600">Live</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm text-gray-500">Offline</span>
+                </>
+              )}
+            </div>
+            
+            {/* Last updated indicator */}
+            <div className="text-xs text-gray-500">
+              Updated: {lastUpdated.toLocaleTimeString()}
+            </div>
+            
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
@@ -270,5 +397,13 @@ export default function DashboardPage() {
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <DashboardContent />
+    </ProtectedRoute>
   );
 }
