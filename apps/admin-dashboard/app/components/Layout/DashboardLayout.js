@@ -23,13 +23,13 @@ export default function DashboardLayout({ children }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="dashboard-layout">
       <Sidebar 
         isOpen={sidebarOpen} 
         onClose={() => setSidebarOpen(false)} 
       />
       
-      <div className="lg:pl-64">
+      <div className="dashboard-main">
         <Header onMenuClick={() => setSidebarOpen(true)} />
         
         <main className="py-6">

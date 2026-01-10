@@ -60,8 +60,25 @@ class AnalyticsService {
   }
 
   async getDashboardSummary(outletId, period = '7d') {
-    const response = await this.api.get(`/dashboard-summary?outletId=${outletId}&period=${period}`);
-    return response.data;
+    try {
+      const response = await this.api.get(`/dashboard?outletId=${outletId}&period=${period}`);
+      return response.data;
+    } catch (error) {
+      console.warn('Analytics service not available, using fallback data');
+      // Return fallback data structure
+      return {
+        revenue: { total: 0, change: 0 },
+        orders: { today: 0, change: 0 },
+        customers: { active: 0, change: 0 },
+        averageOrderValue: 0,
+        averageOrderValueChange: 0,
+        salesChart: null,
+        topItemsChart: null,
+        recentOrders: [],
+        lowStockItems: [],
+        topStaff: []
+      };
+    }
   }
 
   async getTrendAnalysis(outletId, metric, period = '30d') {
@@ -74,6 +91,75 @@ class AnalyticsService {
       outletIds,
       period,
     });
+    return response.data;
+  }
+
+  // Report Generation and Export Methods
+  async generateReport(reportConfig) {
+    const response = await this.api.post('/reports/generate', reportConfig);
+    return response.data;
+  }
+
+  async getExports(outletId) {
+    const response = await this.api.get(`/exports?outletId=${outletId}`);
+    return response.data;
+  }
+
+  async downloadExport(exportId) {
+    const response = await this.api.get(`/exports/${exportId}/download`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  }
+
+  async deleteExport(exportId) {
+    const response = await this.api.delete(`/exports/${exportId}`);
+    return response.data;
+  }
+
+  async retryExport(exportId) {
+    const response = await this.api.post(`/exports/${exportId}/retry`);
+    return response.data;
+  }
+
+  async getExportStatus(exportId) {
+    const response = await this.api.get(`/exports/${exportId}/status`);
+    return response.data;
+  }
+
+  // Advanced Analytics Methods
+  async getMultiOutletConsolidation(outletIds, metrics, period = '30d') {
+    const response = await this.api.post('/multi-outlet/consolidation', {
+      outletIds,
+      metrics,
+      period,
+    });
+    return response.data;
+  }
+
+  async getPerformanceBenchmarks(outletId, industry = 'restaurant') {
+    const response = await this.api.get(`/benchmarks?outletId=${outletId}&industry=${industry}`);
+    return response.data;
+  }
+
+  async getCustomReport(outletId, reportDefinition) {
+    const response = await this.api.post('/reports/custom', {
+      outletId,
+      ...reportDefinition,
+    });
+    return response.data;
+  }
+
+  async scheduleReport(reportConfig, schedule) {
+    const response = await this.api.post('/reports/schedule', {
+      ...reportConfig,
+      schedule,
+    });
+    return response.data;
+  }
+
+  async getScheduledReports(outletId) {
+    const response = await this.api.get(`/reports/scheduled?outletId=${outletId}`);
     return response.data;
   }
 }

@@ -37,9 +37,9 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API routes
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/reports', reportingRoutes);
+// API routes - mount without /api prefix since gateway strips it
+app.use('/', analyticsRoutes);
+app.use('/reports', reportingRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

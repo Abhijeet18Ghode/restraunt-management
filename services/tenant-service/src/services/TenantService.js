@@ -466,6 +466,251 @@ class TenantService {
   }
 
   /**
+   * Get outlets for a tenant
+   */
+  async getTenantOutlets(tenantId) {
+    try {
+      // Check if tenant exists
+      await this.getTenant(tenantId);
+
+      // Get outlets from tenant schema
+      const result = await this.db.query(tenantId, `
+        SELECT 
+          id,
+          name,
+          address,
+          operating_hours,
+          tax_config,
+          is_active,
+          created_at,
+          updated_at
+        FROM outlets 
+        WHERE is_active = true
+        ORDER BY name
+      `);
+
+      const outlets = result.rows.map(row => ({
+        id: row.id,
+        name: row.name,
+        address: typeof row.address === 'string' ? row.address : JSON.stringify(row.address),
+        phone: row.address?.phone || null,
+        email: row.address?.email || null,
+        managerId: null, // Not in current schema
+        isActive: row.is_active,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+
+      return createApiResponse(outlets, 'Outlets retrieved successfully');
+
+    } catch (error) {
+      if (error instanceof TenantNotFoundError) {
+        throw error;
+      }
+      throw new DatabaseError('Failed to get tenant outlets', error.message);
+    }
+  }
+
+  /**
+   * Create a new outlet for a tenant
+   */
+  async createTenantOutlet(tenantId, outletData) {
+    const { name, address, phone, email, isActive = true } = outletData;
+
+    try {
+      // Check if tenant exists
+      await this.getTenant(tenantId);
+
+      const outletId = generateId();
+
+      // Prepare address as JSONB
+      const addressData = {
+        street: address,
+        phone: phone || null,
+        email: email || null
+      };
+
+      // Default operating hours
+      const operatingHours = {
+        monday: { open: '09:00', close: '22:00', closed: false },
+        tuesday: { open: '09:00', close: '22:00', closed: false },
+        wednesday: { open: '09:00', close: '22:00', closed: false },
+        thursday: { open: '09:00', close: '22:00', closed: false },
+        friday: { open: '09:00', close: '22:00', closed: false },
+        saturday: { open: '09:00', close: '22:00', closed: false },
+        sunday: { open: '09:00', close: '22:00', closed: false }
+      };
+
+      // Default tax configuration
+      const taxConfig = {
+        taxRate: 0.18,
+        taxType: 'GST',
+        taxNumber: null
+      };
+
+      // Create outlet in tenant schema
+      await this.db.query(tenantId, `
+        INSERT INTO outlets (
+          id, name, address, operating_hours, tax_config, is_active, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      `, [
+        outletId,
+        name,
+        JSON.stringify(addressData),
+        JSON.stringify(operatingHours),
+        JSON.stringify(taxConfig),
+        isActive
+      ]);
+
+      // Get the created outlet
+      const result = await this.db.query(tenantId, `
+        SELECT 
+          id, name, address, operating_hours, tax_config, is_active, created_at, updated_at
+        FROM outlets 
+        WHERE id = $1
+      `, [outletId]);
+
+      const outlet = {
+        id: result.rows[0].id,
+        name: result.rows[0].name,
+        address: typeof result.rows[0].address === 'string' ? result.rows[0].address : JSON.stringify(result.rows[0].address),
+        phone: result.rows[0].address?.phone || phone,
+        email: result.rows[0].address?.email || email,
+        managerId: null,
+        isActive: result.rows[0].is_active,
+        createdAt: result.rows[0].created_at,
+        updatedAt: result.rows[0].updated_at,
+      };
+
+      return createApiResponse(outlet, 'Outlet created successfully');
+
+    } catch (error) {
+      if (error instanceof TenantNotFoundError) {
+        throw error;
+      }
+      throw new DatabaseError('Failed to create outlet', error.message);
+    }
+  }
+
+  /**
+   * Update an outlet
+   */
+  async updateTenantOutlet(tenantId, outletId, updateData) {
+    const { name, address, phone, email, isActive } = updateData;
+
+    try {
+      // Check if tenant exists
+      await this.getTenant(tenantId);
+
+      const updateFields = [];
+      const updateValues = [];
+      let paramIndex = 1;
+
+      if (name !== undefined) {
+        updateFields.push(`name = $${paramIndex++}`);
+        updateValues.push(name);
+      }
+
+      if (address !== undefined || phone !== undefined || email !== undefined) {
+        // Get current address data
+        const currentResult = await this.db.query(tenantId, `
+          SELECT address FROM outlets WHERE id = $1
+        `, [outletId]);
+
+        if (currentResult.rows.length === 0) {
+          throw new ValidationError('Outlet not found');
+        }
+
+        const currentAddress = currentResult.rows[0].address || {};
+        const updatedAddress = {
+          ...currentAddress,
+          street: address !== undefined ? address : currentAddress.street,
+          phone: phone !== undefined ? phone : currentAddress.phone,
+          email: email !== undefined ? email : currentAddress.email
+        };
+
+        updateFields.push(`address = $${paramIndex++}`);
+        updateValues.push(JSON.stringify(updatedAddress));
+      }
+
+      if (isActive !== undefined) {
+        updateFields.push(`is_active = $${paramIndex++}`);
+        updateValues.push(isActive);
+      }
+
+      if (updateFields.length === 0) {
+        throw new ValidationError('No valid fields to update');
+      }
+
+      updateFields.push(`updated_at = NOW()`);
+      updateValues.push(outletId);
+
+      const query = `
+        UPDATE outlets 
+        SET ${updateFields.join(', ')}
+        WHERE id = $${paramIndex}
+        RETURNING id, name, address, operating_hours, tax_config, is_active, created_at, updated_at
+      `;
+
+      const result = await this.db.query(tenantId, query, updateValues);
+
+      if (result.rows.length === 0) {
+        throw new ValidationError('Outlet not found');
+      }
+
+      const outlet = {
+        id: result.rows[0].id,
+        name: result.rows[0].name,
+        address: typeof result.rows[0].address === 'string' ? result.rows[0].address : JSON.stringify(result.rows[0].address),
+        phone: result.rows[0].address?.phone || null,
+        email: result.rows[0].address?.email || null,
+        managerId: null,
+        isActive: result.rows[0].is_active,
+        createdAt: result.rows[0].created_at,
+        updatedAt: result.rows[0].updated_at,
+      };
+
+      return createApiResponse(outlet, 'Outlet updated successfully');
+
+    } catch (error) {
+      if (error instanceof TenantNotFoundError || error instanceof ValidationError) {
+        throw error;
+      }
+      throw new DatabaseError('Failed to update outlet', error.message);
+    }
+  }
+
+  /**
+   * Delete an outlet
+   */
+  async deleteTenantOutlet(tenantId, outletId) {
+    try {
+      // Check if tenant exists
+      await this.getTenant(tenantId);
+
+      // Soft delete the outlet
+      const result = await this.db.query(tenantId, `
+        UPDATE outlets 
+        SET is_active = false, updated_at = NOW()
+        WHERE id = $1
+        RETURNING id
+      `, [outletId]);
+
+      if (result.rows.length === 0) {
+        throw new ValidationError('Outlet not found');
+      }
+
+      return createApiResponse(null, 'Outlet deleted successfully');
+
+    } catch (error) {
+      if (error instanceof TenantNotFoundError || error instanceof ValidationError) {
+        throw error;
+      }
+      throw new DatabaseError('Failed to delete outlet', error.message);
+    }
+  }
+
+  /**
    * Get features by subscription plan
    */
   getFeaturesByPlan(plan) {

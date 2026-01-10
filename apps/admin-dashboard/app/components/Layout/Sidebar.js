@@ -89,6 +89,12 @@ const navigation = [
         permission: 'inventory.view'
       },
       { 
+        name: 'Reports & Analytics', 
+        href: '/inventory/reports',
+        permission: 'inventory.reports.view',
+        roles: ['admin', 'manager', 'inventory_manager']
+      },
+      { 
         name: 'Suppliers', 
         href: '/inventory/suppliers',
         permission: 'inventory.suppliers.view',
@@ -318,9 +324,9 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* Sidebar */}
       <div className={`
-        fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out
-        lg:translate-x-0 lg:static lg:inset-0
+        dashboard-sidebar
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        lg:translate-x-0
       `}>
         <div className="flex flex-col h-full">
           {/* Header */}

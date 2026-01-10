@@ -41,7 +41,12 @@ app.get('/health', (req, res) => {
 // Socket.IO setup
 const io = new Server(server, {
   cors: {
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3001', 'http://localhost:3002'],
+    origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+      'http://localhost:3000',  // API Gateway
+      'http://localhost:3001',  // Tenant Service
+      'http://localhost:3002',  // POS Interface
+      'http://localhost:3011'   // Admin Dashboard
+    ],
     credentials: true,
   },
   transports: ['websocket', 'polling'],

@@ -5,7 +5,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 class MenuService {
   constructor() {
     this.api = axios.create({
-      baseURL: `${API_BASE_URL}/api/menu`,
+      baseURL: `${API_BASE_URL}/api`,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -27,69 +27,69 @@ class MenuService {
   // Categories
   async getCategories(outletId) {
     const response = await this.api.get(`/categories?outletId=${outletId}`);
-    return response.data;
+    return response.data.data; // Extract the data array from the API response
   }
 
   async createCategory(categoryData) {
     const response = await this.api.post('/categories', categoryData);
-    return response.data;
+    return response.data.data; // Extract the data from the API response
   }
 
   async updateCategory(categoryId, data) {
     const response = await this.api.put(`/categories/${categoryId}`, data);
-    return response.data;
+    return response.data.data; // Extract the data from the API response
   }
 
   async deleteCategory(categoryId) {
     const response = await this.api.delete(`/categories/${categoryId}`);
-    return response.data;
+    return response.data.data; // Extract the data from the API response
   }
 
   // Menu Items
   async getMenuItems(outletId, categoryId = null) {
-    let url = `/items?outletId=${outletId}`;
+    let url = `/menu/items?outletId=${outletId}`;
     if (categoryId) {
       url += `&categoryId=${categoryId}`;
     }
     const response = await this.api.get(url);
-    return response.data;
+    return response.data.data; // Extract the data array from the API response
   }
 
   async createMenuItem(itemData) {
-    const response = await this.api.post('/items', itemData);
-    return response.data;
+    const response = await this.api.post('/menu/items', itemData);
+    return response.data.data; // Extract the data from the API response
   }
 
   async updateMenuItem(itemId, data) {
-    const response = await this.api.put(`/items/${itemId}`, data);
-    return response.data;
+    const response = await this.api.put(`/menu/items/${itemId}`, data);
+    return response.data.data; // Extract the data from the API response
   }
 
   async deleteMenuItem(itemId) {
-    const response = await this.api.delete(`/items/${itemId}`);
-    return response.data;
+    const response = await this.api.delete(`/menu/items/${itemId}`);
+    return response.data.data; // Extract the data from the API response
   }
 
   async updateItemAvailability(itemId, available) {
-    const response = await this.api.patch(`/items/${itemId}/availability`, { available });
+    const response = await this.api.patch(`/menu/items/${itemId}/availability`, { available });
     return response.data;
   }
 
   // Pricing
   async updateItemPrice(itemId, price) {
-    const response = await this.api.patch(`/items/${itemId}/price`, { price });
+    const response = await this.api.patch(`/menu/items/${itemId}/price`, { price });
     return response.data;
   }
 
   async bulkUpdatePrices(updates) {
-    const response = await this.api.post('/pricing/bulk-update', { updates });
+    const response = await this.api.post('/menu/pricing/bulk-update', { updates });
     return response.data;
   }
 
   async bulkUpdateAvailability(itemIds, available) {
-    const response = await this.api.post('/items/bulk-availability', { 
+    const response = await this.api.patch('/menu/items/availability', { 
       itemIds, 
-      available 
+      isAvailable: available 
     });
     return response.data;
   }

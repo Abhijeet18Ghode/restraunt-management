@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 
 export default function CategoryManager({ categories, onCategoriesUpdate }) {
-  const [localCategories, setLocalCategories] = useState(categories || []);
+  const [localCategories, setLocalCategories] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [formData, setFormData] = useState({
@@ -38,7 +38,9 @@ export default function CategoryManager({ categories, onCategoriesUpdate }) {
   const { PERMISSIONS } = useRoleManager();
 
   useEffect(() => {
-    setLocalCategories(categories || []);
+    // Ensure categories is always an array
+    const categoriesArray = Array.isArray(categories) ? categories : [];
+    setLocalCategories(categoriesArray);
   }, [categories]);
 
   const handleDragEnd = async (result) => {
@@ -201,7 +203,7 @@ export default function CategoryManager({ categories, onCategoriesUpdate }) {
                 snapshot.isDraggingOver ? 'bg-blue-50 rounded-lg p-2' : ''
               }`}
             >
-              {localCategories.map((category, index) => (
+              {Array.isArray(localCategories) && localCategories.map((category, index) => (
                 <Draggable
                   key={category.id}
                   draggableId={category.id.toString()}
@@ -274,7 +276,7 @@ export default function CategoryManager({ categories, onCategoriesUpdate }) {
       </DragDropContext>
 
       {/* Empty state */}
-      {localCategories.length === 0 && (
+      {(!Array.isArray(localCategories) || localCategories.length === 0) && (
         <Card className="p-8 text-center">
           <div className="text-gray-400 mb-4">
             <Plus className="h-12 w-12 mx-auto" />

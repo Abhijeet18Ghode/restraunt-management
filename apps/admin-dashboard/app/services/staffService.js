@@ -25,56 +25,54 @@ class StaffService {
   }
 
   // Staff Management
-  async getStaff(outletId, page = 1, limit = 20, role = null, status = 'active') {
-    const params = new URLSearchParams({
-      outletId,
-      page: page.toString(),
-      limit: limit.toString(),
-      status,
-      ...(role && { role })
-    });
-    const response = await this.api.get(`/?${params}`);
-    return response.data;
+  async getStaffMembers(outletId = null, role = null, status = null) {
+    try {
+      const params = {};
+      if (outletId) params.outletId = outletId;
+      if (role) params.role = role;
+      if (status) params.status = status;
+      
+      const response = await this.api.get('/members', { params });
+      return response.data;
+    } catch (error) {
+      console.warn('Staff service not available, returning empty data');
+      return [];
+    }
   }
 
   async getStaffMember(staffId) {
-    const response = await this.api.get(`/${staffId}`);
+    const response = await this.api.get(`/members/${staffId}`);
     return response.data;
   }
 
   async createStaffMember(staffData) {
-    const response = await this.api.post('/', staffData);
+    const response = await this.api.post('/members', staffData);
     return response.data;
   }
 
-  async updateStaffMember(staffId, data) {
-    const response = await this.api.put(`/${staffId}`, data);
-    return response.data;
-  }
-
-  async deactivateStaffMember(staffId, reason) {
-    const response = await this.api.patch(`/${staffId}/deactivate`, { reason });
-    return response.data;
-  }
-
-  async reactivateStaffMember(staffId) {
-    const response = await this.api.patch(`/${staffId}/reactivate`);
+  async updateStaffMember(staffId, staffData) {
+    const response = await this.api.put(`/members/${staffId}`, staffData);
     return response.data;
   }
 
   async deleteStaffMember(staffId) {
-    const response = await this.api.delete(`/${staffId}`);
+    const response = await this.api.delete(`/members/${staffId}`);
     return response.data;
   }
 
-  async searchStaff(outletId, query) {
-    const response = await this.api.get(`/search?outletId=${outletId}&q=${encodeURIComponent(query)}`);
+  async activateStaffMember(staffId) {
+    const response = await this.api.post(`/members/${staffId}/activate`);
     return response.data;
   }
 
-  // Role and Permission Management
-  async getRoles(outletId) {
-    const response = await this.api.get(`/roles?outletId=${outletId}`);
+  async deactivateStaffMember(staffId) {
+    const response = await this.api.post(`/members/${staffId}/deactivate`);
+    return response.data;
+  }
+
+  // Role Management
+  async getAvailableRoles() {
+    const response = await this.api.get('/roles');
     return response.data;
   }
 
@@ -83,8 +81,8 @@ class StaffService {
     return response.data;
   }
 
-  async updateRole(roleId, data) {
-    const response = await this.api.put(`/roles/${roleId}`, data);
+  async updateRole(roleId, roleData) {
+    const response = await this.api.put(`/roles/${roleId}`, roleData);
     return response.data;
   }
 
@@ -93,26 +91,25 @@ class StaffService {
     return response.data;
   }
 
-  async getPermissions() {
-    const response = await this.api.get('/permissions');
-    return response.data;
-  }
-
-  async updateStaffRole(staffId, roleId) {
-    const response = await this.api.patch(`/${staffId}/role`, { roleId });
+  async assignRole(staffId, roleId, outletId = null) {
+    const response = await this.api.post(`/members/${staffId}/assign-role`, {
+      roleId,
+      outletId
+    });
     return response.data;
   }
 
   // Attendance Management
-  async getAttendance(outletId, date = null, staffId = null, page = 1, limit = 20) {
-    const params = new URLSearchParams({
-      outletId,
-      page: page.toString(),
-      limit: limit.toString(),
-      ...(date && { date }),
-      ...(staffId && { staffId })
-    });
-    const response = await this.api.get(`/attendance?${params}`);
+  async getAttendanceRecords(staffId = null, outletId = null, dateRange = null) {
+    const params = {};
+    if (staffId) params.staffId = staffId;
+    if (outletId) params.outletId = outletId;
+    if (dateRange) {
+      params.startDate = dateRange.startDate;
+      params.endDate = dateRange.endDate;
+    }
+    
+    const response = await this.api.get('/attendance', { params });
     return response.data;
   }
 
@@ -120,7 +117,8 @@ class StaffService {
     const response = await this.api.post('/attendance/clock-in', {
       staffId,
       outletId,
-      location
+      location,
+      timestamp: new Date().toISOString()
     });
     return response.data;
   }
@@ -129,92 +127,60 @@ class StaffService {
     const response = await this.api.post('/attendance/clock-out', {
       staffId,
       outletId,
-      location
+      location,
+      timestamp: new Date().toISOString()
     });
     return response.data;
   }
 
-  async startBreak(staffId, breakType = 'regular') {
-    const response = await this.api.post('/attendance/break-start', {
+  async addBreak(staffId, breakType, duration) {
+    const response = await this.api.post('/attendance/break', {
       staffId,
-      breakType
+      breakType,
+      duration,
+      timestamp: new Date().toISOString()
     });
     return response.data;
   }
 
-  async endBreak(staffId) {
-    const response = await this.api.post('/attendance/break-end', {
-      staffId
-    });
-    return response.data;
-  }
-
-  async getAttendanceReport(outletId, startDate, endDate, staffId = null) {
-    const params = new URLSearchParams({
-      outletId,
-      startDate,
-      endDate,
-      ...(staffId && { staffId })
-    });
-    const response = await this.api.get(`/attendance/report?${params}`);
-    return response.data;
-  }
-
-  async updateAttendance(attendanceId, data) {
-    const response = await this.api.put(`/attendance/${attendanceId}`, data);
+  async updateAttendance(attendanceId, attendanceData) {
+    const response = await this.api.put(`/attendance/${attendanceId}`, attendanceData);
     return response.data;
   }
 
   // Performance Management
-  async getPerformanceMetrics(staffId, period = '30d') {
-    const response = await this.api.get(`/${staffId}/performance?period=${period}`);
+  async getPerformanceMetrics(staffId, dateRange = null) {
+    const params = {};
+    if (dateRange) {
+      params.startDate = dateRange.startDate;
+      params.endDate = dateRange.endDate;
+    }
+    
+    const response = await this.api.get(`/performance/${staffId}`, { params });
     return response.data;
   }
 
-  async getPerformanceReviews(staffId, page = 1, limit = 10) {
-    const response = await this.api.get(`/${staffId}/performance/reviews?page=${page}&limit=${limit}`);
+  async addPerformanceReview(staffId, reviewData) {
+    const response = await this.api.post(`/performance/${staffId}/reviews`, reviewData);
     return response.data;
   }
 
-  async createPerformanceReview(reviewData) {
-    const response = await this.api.post('/performance/reviews', reviewData);
-    return response.data;
-  }
-
-  async updatePerformanceReview(reviewId, data) {
-    const response = await this.api.put(`/performance/reviews/${reviewId}`, data);
-    return response.data;
-  }
-
-  async getPerformanceGoals(staffId) {
-    const response = await this.api.get(`/${staffId}/performance/goals`);
-    return response.data;
-  }
-
-  async setPerformanceGoals(staffId, goals) {
-    const response = await this.api.post(`/${staffId}/performance/goals`, { goals });
-    return response.data;
-  }
-
-  async updatePerformanceGoal(goalId, data) {
-    const response = await this.api.put(`/performance/goals/${goalId}`, data);
-    return response.data;
-  }
-
-  async getPerformanceDashboard(outletId, period = '30d') {
-    const response = await this.api.get(`/performance/dashboard?outletId=${outletId}&period=${period}`);
+  async getPerformanceReviews(staffId) {
+    const response = await this.api.get(`/performance/${staffId}/reviews`);
     return response.data;
   }
 
   // Schedule Management
-  async getSchedules(outletId, startDate, endDate, staffId = null) {
-    const params = new URLSearchParams({
-      outletId,
-      startDate,
-      endDate,
-      ...(staffId && { staffId })
-    });
-    const response = await this.api.get(`/schedules?${params}`);
+  async getSchedules(outletId = null, staffId = null, dateRange = null) {
+    const params = {};
+    if (outletId) params.outletId = outletId;
+    if (staffId) params.staffId = staffId;
+    if (dateRange) {
+      params.startDate = dateRange.startDate;
+      params.endDate = dateRange.endDate;
+    }
+    
+    const response = await this.api.get('/schedules', { params });
     return response.data;
   }
 
@@ -223,8 +189,8 @@ class StaffService {
     return response.data;
   }
 
-  async updateSchedule(scheduleId, data) {
-    const response = await this.api.put(`/schedules/${scheduleId}`, data);
+  async updateSchedule(scheduleId, scheduleData) {
+    const response = await this.api.put(`/schedules/${scheduleId}`, scheduleData);
     return response.data;
   }
 
@@ -233,129 +199,70 @@ class StaffService {
     return response.data;
   }
 
-  async getScheduleTemplates(outletId) {
-    const response = await this.api.get(`/schedules/templates?outletId=${outletId}`);
-    return response.data;
-  }
-
-  async createScheduleTemplate(templateData) {
-    const response = await this.api.post('/schedules/templates', templateData);
-    return response.data;
-  }
-
-  async applyScheduleTemplate(templateId, startDate, endDate) {
-    const response = await this.api.post(`/schedules/templates/${templateId}/apply`, {
-      startDate,
-      endDate
-    });
-    return response.data;
-  }
-
-  // Training Management
-  async getTrainingPrograms(outletId) {
-    const response = await this.api.get(`/training/programs?outletId=${outletId}`);
-    return response.data;
-  }
-
-  async createTrainingProgram(programData) {
-    const response = await this.api.post('/training/programs', programData);
-    return response.data;
-  }
-
-  async updateTrainingProgram(programId, data) {
-    const response = await this.api.put(`/training/programs/${programId}`, data);
-    return response.data;
-  }
-
-  async assignTraining(staffId, programId, dueDate) {
-    const response = await this.api.post('/training/assignments', {
-      staffId,
-      programId,
-      dueDate
-    });
-    return response.data;
-  }
-
-  async getStaffTraining(staffId) {
-    const response = await this.api.get(`/${staffId}/training`);
-    return response.data;
-  }
-
-  async completeTraining(assignmentId, completionData) {
-    const response = await this.api.post(`/training/assignments/${assignmentId}/complete`, completionData);
-    return response.data;
-  }
-
   // Payroll Management
-  async getPayroll(outletId, payPeriod, staffId = null) {
-    const params = new URLSearchParams({
-      outletId,
-      payPeriod,
-      ...(staffId && { staffId })
-    });
-    const response = await this.api.get(`/payroll?${params}`);
-    return response.data;
-  }
-
-  async calculatePayroll(outletId, payPeriod) {
-    const response = await this.api.post('/payroll/calculate', {
-      outletId,
-      payPeriod
-    });
-    return response.data;
-  }
-
-  async approvePayroll(payrollId) {
-    const response = await this.api.patch(`/payroll/${payrollId}/approve`);
-    return response.data;
-  }
-
-  async getPayrollReport(outletId, startDate, endDate) {
-    const response = await this.api.get(`/payroll/report?outletId=${outletId}&startDate=${startDate}&endDate=${endDate}`);
-    return response.data;
-  }
-
-  // Staff Analytics
-  async getStaffAnalytics(outletId, period = '30d') {
-    const response = await this.api.get(`/analytics?outletId=${outletId}&period=${period}`);
-    return response.data;
-  }
-
-  async getTurnoverAnalysis(outletId, period = '12m') {
-    const response = await this.api.get(`/analytics/turnover?outletId=${outletId}&period=${period}`);
-    return response.data;
-  }
-
-  async getProductivityMetrics(outletId, period = '30d') {
-    const response = await this.api.get(`/analytics/productivity?outletId=${outletId}&period=${period}`);
-    return response.data;
-  }
-
-  // Bulk Operations
-  async importStaff(outletId, csvData) {
-    const formData = new FormData();
-    formData.append('file', csvData);
-    formData.append('outletId', outletId);
+  async getPayrollRecords(outletId = null, payPeriod = null) {
+    const params = {};
+    if (outletId) params.outletId = outletId;
+    if (payPeriod) {
+      params.startDate = payPeriod.startDate;
+      params.endDate = payPeriod.endDate;
+    }
     
-    const response = await this.api.post('/import', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    const response = await this.api.get('/payroll', { params });
+    return response.data;
+  }
+
+  async calculatePayroll(staffId, payPeriod) {
+    const response = await this.api.post('/payroll/calculate', {
+      staffId,
+      startDate: payPeriod.startDate,
+      endDate: payPeriod.endDate
     });
     return response.data;
   }
 
-  async exportStaff(outletId, format = 'csv') {
-    const response = await this.api.get(`/export?outletId=${outletId}&format=${format}`, {
+  async processPayroll(payrollData) {
+    const response = await this.api.post('/payroll/process', payrollData);
+    return response.data;
+  }
+
+  // Reports and Analytics
+  async getStaffAnalytics(outletId = null, dateRange = null) {
+    const params = {};
+    if (outletId) params.outletId = outletId;
+    if (dateRange) {
+      params.startDate = dateRange.startDate;
+      params.endDate = dateRange.endDate;
+    }
+    
+    const response = await this.api.get('/analytics', { params });
+    return response.data;
+  }
+
+  async exportStaffReport(reportType, params = {}) {
+    const response = await this.api.get(`/reports/export/${reportType}`, {
+      params,
       responseType: 'blob'
     });
     return response.data;
   }
 
-  async bulkUpdateStaff(updates) {
-    const response = await this.api.post('/bulk-update', { updates });
-    return response.data;
+  // Real-time Updates
+  subscribeToStaffUpdates(callback) {
+    if (typeof window !== 'undefined' && window.staffSocket) {
+      window.staffSocket.on('staff_updated', callback);
+      window.staffSocket.on('attendance_updated', callback);
+      window.staffSocket.on('schedule_updated', callback);
+    }
+  }
+
+  unsubscribeFromStaffUpdates(callback) {
+    if (typeof window !== 'undefined' && window.staffSocket) {
+      window.staffSocket.off('staff_updated', callback);
+      window.staffSocket.off('attendance_updated', callback);
+      window.staffSocket.off('schedule_updated', callback);
+    }
   }
 }
 
-export default StaffService;
+export const staffService = new StaffService();

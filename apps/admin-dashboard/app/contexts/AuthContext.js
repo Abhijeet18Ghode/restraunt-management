@@ -19,18 +19,25 @@ export function AuthProvider({ children }) {
 
   const checkAuth = async () => {
     try {
+      console.log('🔄 AuthContext: Starting auth check...');
       const token = Cookies.get('auth_token');
+      console.log('📋 AuthContext: Token found:', !!token);
+      
       if (!token) {
+        console.log('❌ AuthContext: No token found, setting loading to false');
         setLoading(false);
         return;
       }
 
+      console.log('📋 AuthContext: Validating token...');
       const userData = await authService.validateToken(token);
+      console.log('✅ AuthContext: Token validated, user data:', userData);
       setUser(userData);
     } catch (error) {
-      console.error('Auth check failed:', error);
+      console.error('❌ AuthContext: Auth check failed:', error);
       Cookies.remove('auth_token');
     } finally {
+      console.log('🏁 AuthContext: Setting loading to false');
       setLoading(false);
     }
   };

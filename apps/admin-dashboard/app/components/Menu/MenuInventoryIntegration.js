@@ -96,15 +96,15 @@ export default function MenuInventoryIntegration({
   // Set up real-time updates
   useEffect(() => {
     if (autoRefresh) {
-      // Subscribe to WebSocket updates
-      websocketService.subscribe('inventory_updated', handleInventoryUpdate);
-      websocketService.subscribe('low_stock_alert', handleInventoryUpdate);
-      websocketService.subscribe('menu_availability_changed', handleInventoryUpdate);
+      // Subscribe to WebSocket updates using the correct method names
+      websocketService.on('stockUpdated', handleInventoryUpdate);
+      websocketService.on('lowStockAlert', handleInventoryUpdate);
+      websocketService.on('outOfStockAlert', handleInventoryUpdate);
 
       return () => {
-        websocketService.unsubscribe('inventory_updated', handleInventoryUpdate);
-        websocketService.unsubscribe('low_stock_alert', handleInventoryUpdate);
-        websocketService.unsubscribe('menu_availability_changed', handleInventoryUpdate);
+        websocketService.off('stockUpdated', handleInventoryUpdate);
+        websocketService.off('lowStockAlert', handleInventoryUpdate);
+        websocketService.off('outOfStockAlert', handleInventoryUpdate);
       };
     }
   }, [autoRefresh, handleInventoryUpdate]);

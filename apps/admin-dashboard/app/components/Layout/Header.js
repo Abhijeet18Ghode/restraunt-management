@@ -24,7 +24,7 @@ export default function Header({ onMenuClick }) {
   };
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200">
+    <header className="sticky top-0 z-20 bg-white shadow-sm border-b border-gray-200">
       <div className="flex items-center justify-between h-16 px-4">
         {/* Left side */}
         <div className="flex items-center">

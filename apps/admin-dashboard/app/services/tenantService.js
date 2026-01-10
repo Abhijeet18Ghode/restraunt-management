@@ -25,33 +25,47 @@ class TenantService {
   }
 
   async getTenant(tenantId) {
-    const response = await this.api.get(`/${tenantId}`);
-    return response.data;
+    try {
+      console.log('📋 TenantService: Getting tenant data for ID:', tenantId);
+      const response = await this.api.get(`/${tenantId}`);
+      console.log('✅ TenantService: Tenant API response:', response.data);
+      return response.data.data; // Extract data from API response format
+    } catch (error) {
+      console.error('❌ TenantService: Failed to get tenant:', error.response?.data || error.message);
+      throw error;
+    }
   }
 
   async updateTenant(tenantId, data) {
     const response = await this.api.put(`/${tenantId}`, data);
-    return response.data;
+    return response.data.data; // Extract data from API response format
   }
 
   async getOutlets(tenantId) {
-    const response = await this.api.get(`/${tenantId}/outlets`);
-    return response.data;
+    try {
+      console.log('📋 TenantService: Getting outlets for tenant ID:', tenantId);
+      const response = await this.api.get(`/${tenantId}/outlets`);
+      console.log('✅ TenantService: Outlets API response:', response.data);
+      return response.data.data; // Extract data from API response format
+    } catch (error) {
+      console.error('❌ TenantService: Failed to get outlets:', error.response?.data || error.message);
+      throw error;
+    }
   }
 
   async createOutlet(tenantId, outletData) {
     const response = await this.api.post(`/${tenantId}/outlets`, outletData);
-    return response.data;
+    return response.data.data; // Extract data from API response format
   }
 
   async updateOutlet(tenantId, outletId, data) {
     const response = await this.api.put(`/${tenantId}/outlets/${outletId}`, data);
-    return response.data;
+    return response.data.data; // Extract data from API response format
   }
 
   async deleteOutlet(tenantId, outletId) {
     const response = await this.api.delete(`/${tenantId}/outlets/${outletId}`);
-    return response.data;
+    return response.data.data; // Extract data from API response format
   }
 
   async getTenantSettings(tenantId) {

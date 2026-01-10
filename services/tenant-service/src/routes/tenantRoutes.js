@@ -222,4 +222,96 @@ router.get('/:tenantId/config',
   }
 );
 
+/**
+ * GET /api/tenants/:tenantId/outlets
+ * Get outlets for a tenant
+ */
+router.get('/:tenantId/outlets',
+  authenticateToken,
+  requireTenantContext,
+  param('tenantId').isUUID().withMessage('Valid tenant ID is required'),
+  handleValidationErrors,
+  async (req, res, next) => {
+    try {
+      const tenantService = new TenantService(req.app.locals.db);
+      const result = await tenantService.getTenantOutlets(req.params.tenantId);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /api/tenants/:tenantId/outlets
+ * Create a new outlet for a tenant
+ */
+router.post('/:tenantId/outlets',
+  authenticateToken,
+  requireTenantContext,
+  param('tenantId').isUUID().withMessage('Valid tenant ID is required'),
+  body('name').isLength({ min: 2, max: 100 }).withMessage('Outlet name must be between 2 and 100 characters'),
+  body('address').isLength({ min: 5, max: 500 }).withMessage('Address must be between 5 and 500 characters'),
+  body('phone').optional().matches(/^[+]?[1-9][\d\s\-()]{7,15}$/).withMessage('Valid phone number is required'),
+  body('email').optional().isEmail().withMessage('Valid email is required'),
+  body('isActive').optional().isBoolean().withMessage('isActive must be a boolean'),
+  handleValidationErrors,
+  async (req, res, next) => {
+    try {
+      const tenantService = new TenantService(req.app.locals.db);
+      const result = await tenantService.createTenantOutlet(req.params.tenantId, req.body);
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * PUT /api/tenants/:tenantId/outlets/:outletId
+ * Update an outlet
+ */
+router.put('/:tenantId/outlets/:outletId',
+  authenticateToken,
+  requireTenantContext,
+  param('tenantId').isUUID().withMessage('Valid tenant ID is required'),
+  param('outletId').isUUID().withMessage('Valid outlet ID is required'),
+  body('name').optional().isLength({ min: 2, max: 100 }).withMessage('Outlet name must be between 2 and 100 characters'),
+  body('address').optional().isLength({ min: 5, max: 500 }).withMessage('Address must be between 5 and 500 characters'),
+  body('phone').optional().matches(/^[+]?[1-9][\d\s\-()]{7,15}$/).withMessage('Valid phone number is required'),
+  body('email').optional().isEmail().withMessage('Valid email is required'),
+  body('isActive').optional().isBoolean().withMessage('isActive must be a boolean'),
+  handleValidationErrors,
+  async (req, res, next) => {
+    try {
+      const tenantService = new TenantService(req.app.locals.db);
+      const result = await tenantService.updateTenantOutlet(req.params.tenantId, req.params.outletId, req.body);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * DELETE /api/tenants/:tenantId/outlets/:outletId
+ * Delete an outlet
+ */
+router.delete('/:tenantId/outlets/:outletId',
+  authenticateToken,
+  requireTenantContext,
+  param('tenantId').isUUID().withMessage('Valid tenant ID is required'),
+  param('outletId').isUUID().withMessage('Valid outlet ID is required'),
+  handleValidationErrors,
+  async (req, res, next) => {
+    try {
+      const tenantService = new TenantService(req.app.locals.db);
+      const result = await tenantService.deleteTenantOutlet(req.params.tenantId, req.params.outletId);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 module.exports = router;

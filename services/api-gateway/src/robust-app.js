@@ -124,6 +124,12 @@ function rewritePath(path, prefix) {
     return path.replace('/api/auth', '/auth');
   }
   
+  // Special handling for menu service routes - they should keep the full /api path
+  if ((prefix === '/api/menu' || prefix === '/api/categories') && path.startsWith('/api/')) {
+    // Keep the full path for menu service routes
+    return path;
+  }
+  
   // Only rewrite if the path actually starts with the prefix
   if (path.startsWith(prefix)) {
     const rewritten = path.replace(prefix, '') || '/';
@@ -210,6 +216,7 @@ const apiRoutes = {
   '/api/tenants': 'tenant-service',
   '/api/auth': 'tenant-service',  // Route auth to tenant service
   '/api/menu': 'menu-service',
+  '/api/categories': 'menu-service',  // Route categories to menu service
   '/api/inventory': 'inventory-service',
   '/api/pos': 'pos-service',
   '/api/online-orders': 'online-order-service',

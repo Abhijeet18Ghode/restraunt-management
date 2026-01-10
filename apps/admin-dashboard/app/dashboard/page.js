@@ -85,34 +85,39 @@ function DashboardContent() {
   // Initialize real-time connection
   useEffect(() => {
     if (selectedOutlet && currentTenant && user) {
-      // Connect to WebSocket
-      websocketService.connect(currentTenant.id, user.id);
-      
-      // Subscribe to real-time events
-      websocketService.on('connection', handleConnectionStatus);
-      websocketService.on('salesUpdate', handleSalesUpdate);
-      websocketService.on('orderMetricsUpdate', handleOrderMetricsUpdate);
-      websocketService.on('stockUpdated', handleInventoryUpdate);
-      websocketService.on('lowStockAlert', handleInventoryUpdate);
-      websocketService.on('newOrder', handleNewOrder);
+      try {
+        // Connect to WebSocket
+        websocketService.connect(currentTenant.id, user.id);
+        
+        // Subscribe to real-time events
+        websocketService.on('connection', handleConnectionStatus);
+        websocketService.on('salesUpdate', handleSalesUpdate);
+        websocketService.on('orderMetricsUpdate', handleOrderMetricsUpdate);
+        websocketService.on('stockUpdated', handleInventoryUpdate);
+        websocketService.on('lowStockAlert', handleInventoryUpdate);
+        websocketService.on('newOrder', handleNewOrder);
 
-      // Subscribe to relevant data streams
-      websocketService.subscribeToAnalytics([selectedOutlet.id]);
-      websocketService.subscribeToOrders([selectedOutlet.id]);
-      websocketService.subscribeToInventory([selectedOutlet.id]);
-      
-      // Start heartbeat
-      websocketService.startHeartbeat();
+        // Subscribe to relevant data streams
+        websocketService.subscribeToAnalytics([selectedOutlet.id]);
+        websocketService.subscribeToOrders([selectedOutlet.id]);
+        websocketService.subscribeToInventory([selectedOutlet.id]);
+        
+        // Start heartbeat
+        websocketService.startHeartbeat();
 
-      return () => {
-        // Cleanup event listeners
-        websocketService.off('connection', handleConnectionStatus);
-        websocketService.off('salesUpdate', handleSalesUpdate);
-        websocketService.off('orderMetricsUpdate', handleOrderMetricsUpdate);
-        websocketService.off('stockUpdated', handleInventoryUpdate);
-        websocketService.off('lowStockAlert', handleInventoryUpdate);
-        websocketService.off('newOrder', handleNewOrder);
-      };
+        return () => {
+          // Cleanup event listeners
+          websocketService.off('connection', handleConnectionStatus);
+          websocketService.off('salesUpdate', handleSalesUpdate);
+          websocketService.off('orderMetricsUpdate', handleOrderMetricsUpdate);
+          websocketService.off('stockUpdated', handleInventoryUpdate);
+          websocketService.off('lowStockAlert', handleInventoryUpdate);
+          websocketService.off('newOrder', handleNewOrder);
+        };
+      } catch (error) {
+        console.warn('WebSocket connection failed:', error);
+        // Continue without real-time features
+      }
     }
   }, [selectedOutlet, currentTenant, user, handleConnectionStatus, handleSalesUpdate, handleOrderMetricsUpdate, handleInventoryUpdate, handleNewOrder]);
 
@@ -130,6 +135,19 @@ function DashboardContent() {
       setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
+      // Set fallback data to prevent infinite loading
+      setDashboardData({
+        revenue: { total: 0, change: 0 },
+        orders: { today: 0, change: 0 },
+        customers: { active: 0, change: 0 },
+        averageOrderValue: 0,
+        averageOrderValueChange: 0,
+        salesChart: null,
+        topItemsChart: null,
+        recentOrders: [],
+        lowStockItems: [],
+        topStaff: []
+      });
     } finally {
       setLoading(false);
     }
