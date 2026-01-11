@@ -78,10 +78,12 @@ app.get('/services/status', async (req, res) => {
   });
 });
 
-// Simple proxy routes
+// Simple proxy routes with enhanced inventory support
+// IMPORTANT: More specific routes must come BEFORE general routes
 const proxyRoutes = {
   '/api/tenants': 'http://localhost:3001',
   '/api/menu': 'http://localhost:3002',
+  '/api/inventory/menu-items': 'http://localhost:3003',  // Explicit inventory menu-items route (MUST come before /api/inventory)
   '/api/inventory': 'http://localhost:3003',
   '/api/pos': 'http://localhost:3004',
   '/api/online-orders': 'http://localhost:3005',
@@ -91,21 +93,61 @@ const proxyRoutes = {
   '/api/payments': 'http://localhost:3009'
 };
 
-// Create proxy middleware for each route
-Object.entries(proxyRoutes).forEach(([route, target]) => {
+// Create proxy middleware for each route with enhanced error handling
+// Sort routes by specificity (longest paths first) to ensure correct matching
+const sortedRoutes = Object.entries(proxyRoutes).sort((a, b) => b[0].length - a[0].length);
+
+sortedRoutes.forEach(([route, target]) => {
   app.use(route, createProxyMiddleware({
     target,
     changeOrigin: true,
     pathRewrite: (path) => {
-      return path.replace(route, '');
+      console.log(`[ROUTING] Rewriting path: ${path} for route: ${route}`);
+      
+      // Special handling for inventory menu-items routes
+      if (route === '/api/inventory/menu-items' && path.startsWith('/api/inventory/menu-items')) {
+        const rewritten = path.replace('/api/inventory', '');
+        console.log(`[ROUTING] Inventory menu-items path rewritten: ${path} -> ${rewritten}`);
+        return rewritten;
+      }
+      
+      // Standard path rewriting
+      const rewritten = path.replace(route, '');
+      console.log(`[ROUTING] Standard path rewritten: ${path} -> ${rewritten}`);
+      return rewritten;
     },
     onError: (err, req, res) => {
-      console.error(`Proxy error for ${route}:`, err.message);
-      res.status(503).json({
-        error: 'Service temporarily unavailable',
-        service: route,
-        message: 'Please try again later'
+      const errorId = `err-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      console.error(`[ERROR] ${errorId} - Proxy error for ${route}:`, {
+        error: err.message,
+        code: err.code,
+        path: req.originalUrl,
+        method: req.method,
+        timestamp: new Date().toISOString()
       });
+      
+      if (!res.headersSent) {
+        let errorResponse = {
+          success: false,
+          error: 'Service temporarily unavailable',
+          service: route,
+          timestamp: new Date().toISOString(),
+          errorId: errorId
+        };
+
+        if (err.code === 'ECONNREFUSED') {
+          errorResponse.message = `The service at ${route} is currently offline. Please try again later.`;
+          errorResponse.code = 'SERVICE_OFFLINE';
+        } else if (err.code === 'ETIMEDOUT') {
+          errorResponse.message = `The service at ${route} is taking too long to respond. Please try again.`;
+          errorResponse.code = 'SERVICE_TIMEOUT';
+        } else {
+          errorResponse.message = 'Please try again later';
+          errorResponse.code = 'SERVICE_ERROR';
+        }
+
+        res.status(503).json(errorResponse);
+      }
     },
     onProxyReq: (proxyReq, req, res) => {
       // Forward tenant context
@@ -116,6 +158,19 @@ Object.entries(proxyRoutes).forEach(([route, target]) => {
       // Add request ID for tracing
       const requestId = req.headers['x-request-id'] || `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       proxyReq.setHeader('x-request-id', requestId);
+      
+      console.log(`[PROXY REQ] ${req.method} ${req.originalUrl} -> ${route} (Request ID: ${requestId})`);
+    },
+    onProxyRes: (proxyRes, req, res) => {
+      console.log(`[PROXY RES] ${route} responded: ${proxyRes.statusCode} for ${req.method} ${req.originalUrl}`);
+      
+      if (proxyRes.statusCode >= 400) {
+        console.warn(`[PROXY RES] Error response from ${route}:`, {
+          status: proxyRes.statusCode,
+          path: req.originalUrl,
+          method: req.method
+        });
+      }
     }
   }));
 });

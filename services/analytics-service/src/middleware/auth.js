@@ -33,7 +33,13 @@ const requireRole = (roles) => {
       });
     }
 
-    if (!roles.includes(req.user.role)) {
+    // Map TENANT_ADMIN to admin for role checking
+    let userRole = req.user.role;
+    if (userRole === 'TENANT_ADMIN') {
+      userRole = 'admin';
+    }
+
+    if (!roles.includes(userRole)) {
       return res.status(403).json({ 
         success: false, 
         error: 'Insufficient permissions.' 

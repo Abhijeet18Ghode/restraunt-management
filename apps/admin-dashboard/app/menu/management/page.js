@@ -49,6 +49,15 @@ function MenuManagementContent() {
   const { selectedOutlet } = useTenant();
   const { PERMISSIONS, canAccessFeature } = useRoleManager();
 
+  // Utility function to safely format price
+  const formatPrice = (price) => {
+    if (typeof price === 'number') {
+      return price.toFixed(2);
+    }
+    const numPrice = parseFloat(price || 0);
+    return isNaN(numPrice) ? '0.00' : numPrice.toFixed(2);
+  };
+
   useEffect(() => {
     if (selectedOutlet) {
       loadData();
@@ -482,7 +491,7 @@ function MenuManagementContent() {
 
                 <div className="flex items-center justify-between mb-4">
                   <div className="text-lg font-semibold text-gray-900">
-                    ${item.price?.toFixed(2)}
+                    ${formatPrice(item.price)}
                   </div>
                   <div className={`px-2 py-1 rounded-full text-xs font-medium ${
                     item.isAvailable 
@@ -622,7 +631,7 @@ function MenuManagementContent() {
                         {categories.find(cat => cat.id === item.categoryId)?.name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        ${item.price?.toFixed(2)}
+                        ${formatPrice(item.price)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${

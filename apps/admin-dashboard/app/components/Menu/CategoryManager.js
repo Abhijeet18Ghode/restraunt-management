@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import Card from '../UI/Card';
 import Button from '../UI/Button';
@@ -19,10 +19,54 @@ import {
   Save,
   X,
   AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
+
+// Error Boundary Component for Drag Operations
+class DragErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Drag operation error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center p-4 bg-red-50 border border-red-200 rounded-lg">
+          <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+          <div className="flex-1">
+            <span className="text-red-700">
+              Drag and drop temporarily unavailable. 
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => this.setState({ hasError: false, error: null })}
+              className="ml-2"
+            >
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Retry
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 export default function CategoryManager({ categories, onCategoriesUpdate }) {
   const [localCategories, setLocalCategories] = useState([]);
+  const [previousCategories, setPreviousCategories] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [formData, setFormData] = useState({
@@ -32,46 +76,83 @@ export default function CategoryManager({ categories, onCategoriesUpdate }) {
     isActive: true,
   });
   const [loading, setLoading] = useState(false);
+  const [dragLoading, setDragLoading] = useState(false);
   const [error, setError] = useState('');
 
   const { selectedOutlet } = useTenant();
   const { PERMISSIONS } = useRoleManager();
 
   useEffect(() => {
-    // Ensure categories is always an array
+    // Ensure categories is always an array with proper validation
     const categoriesArray = Array.isArray(categories) ? categories : [];
     setLocalCategories(categoriesArray);
+    setPreviousCategories(categoriesArray);
   }, [categories]);
 
-  const handleDragEnd = async (result) => {
+  const handleDragEnd = useCallback(async (result) => {
+    // Early return if no destination or invalid drag
     if (!result.destination) return;
-
-    const items = Array.from(localCategories);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-
-    // Update display order
-    const updatedItems = items.map((item, index) => ({
-      ...item,
-      displayOrder: index,
-    }));
-
-    setLocalCategories(updatedItems);
+    
+    const { source, destination } = result;
+    
+    // No change if dropped in same position
+    if (source.index === destination.index) return;
 
     try {
+      setDragLoading(true);
+      setError('');
+
+      // Optimistic update - update UI immediately
+      const items = Array.from(localCategories);
+      const [reorderedItem] = items.splice(source.index, 1);
+      items.splice(destination.index, 0, reorderedItem);
+
+      // Update display order
+      const updatedItems = items.map((item, index) => ({
+        ...item,
+        displayOrder: index,
+      }));
+
+      // Store previous state for rollback
+      setPreviousCategories(localCategories);
+      
+      // Apply optimistic update
+      setLocalCategories(updatedItems);
+
       // Save new order to backend
       await menuService.reorderCategories(
         selectedOutlet.id,
         updatedItems.map(item => item.id)
       );
+      
+      // Notify parent component of successful update
       onCategoriesUpdate(updatedItems);
+      
     } catch (error) {
       console.error('Failed to reorder categories:', error);
-      setError('Failed to save category order');
-      // Revert on error
-      setLocalCategories(categories);
+      
+      // Rollback on failure
+      setLocalCategories(previousCategories);
+      
+      // Show user-friendly error with retry option
+      setError(
+        <div className="flex items-center justify-between">
+          <span>Failed to save category order. Please try again.</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDragEnd(result)}
+            className="ml-2"
+          >
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Retry
+          </Button>
+        </div>
+      );
+    } finally {
+      setDragLoading(false);
     }
-  };
+  }, [localCategories, previousCategories, selectedOutlet.id, onCategoriesUpdate]);
 
   const openModal = (category = null) => {
     if (category) {
@@ -180,7 +261,13 @@ export default function CategoryManager({ categories, onCategoriesUpdate }) {
       {error && (
         <div className="flex items-center p-4 bg-red-50 border border-red-200 rounded-lg">
           <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-          <span className="text-red-700">{error}</span>
+          <div className="flex-1">
+            {typeof error === 'string' ? (
+              <span className="text-red-700">{error}</span>
+            ) : (
+              error
+            )}
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -192,88 +279,103 @@ export default function CategoryManager({ categories, onCategoriesUpdate }) {
         </div>
       )}
 
-      {/* Categories List */}
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="categories">
-          {(provided, snapshot) => (
-            <div
-              {...provided.droppableProps}
-              ref={provided.innerRef}
-              className={`space-y-3 ${
-                snapshot.isDraggingOver ? 'bg-blue-50 rounded-lg p-2' : ''
-              }`}
-            >
-              {Array.isArray(localCategories) && localCategories.map((category, index) => (
-                <Draggable
-                  key={category.id}
-                  draggableId={category.id.toString()}
-                  index={index}
-                >
-                  {(provided, snapshot) => (
-                    <Card
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      className={`p-4 ${
-                        snapshot.isDragging ? 'shadow-lg rotate-2' : ''
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div
-                            {...provided.dragHandleProps}
-                            className="cursor-grab active:cursor-grabbing"
-                          >
-                            <GripVertical className="h-5 w-5 text-gray-400" />
+      {/* Drag Loading Indicator */}
+      {dragLoading && (
+        <div className="flex items-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2" />
+          <span className="text-blue-700">Saving category order...</span>
+        </div>
+      )}
+
+      {/* Categories List with Error Boundary */}
+      <DragErrorBoundary>
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="categories">
+            {(provided, snapshot) => (
+              <div
+                {...provided.droppableProps}
+                ref={provided.innerRef}
+                className={`space-y-3 ${
+                  snapshot.isDraggingOver ? 'bg-blue-50 rounded-lg p-2' : ''
+                }`}
+              >
+                {Array.isArray(localCategories) && localCategories.map((category, index) => (
+                  <Draggable
+                    key={category.id}
+                    draggableId={category.id.toString()}
+                    index={index}
+                    isDragDisabled={dragLoading}
+                  >
+                    {(provided, snapshot) => (
+                      <Card
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        className={`p-4 transition-all duration-200 ${
+                          snapshot.isDragging ? 'shadow-lg rotate-2 z-50' : ''
+                        } ${dragLoading ? 'opacity-50' : ''}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div
+                              {...provided.dragHandleProps}
+                              className={`cursor-grab active:cursor-grabbing ${
+                                dragLoading ? 'cursor-not-allowed' : ''
+                              }`}
+                            >
+                              <GripVertical className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <div>
+                              <h3 className="text-sm font-medium text-gray-900">
+                                {category.name}
+                              </h3>
+                              {category.description && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {category.description}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="text-sm font-medium text-gray-900">
-                              {category.name}
-                            </h3>
-                            {category.description && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                {category.description}
-                              </p>
-                            )}
+
+                          <div className="flex items-center space-x-2">
+                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              category.isActive !== false
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {category.isActive !== false ? 'Active' : 'Inactive'}
+                            </div>
+
+                            <PermissionGate permission={PERMISSIONS.MENU_CATEGORIES_MANAGE}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openModal(category)}
+                                disabled={dragLoading}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(category.id)}
+                                className="text-red-600 hover:text-red-700"
+                                disabled={dragLoading}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </PermissionGate>
                           </div>
                         </div>
-
-                        <div className="flex items-center space-x-2">
-                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            category.isActive !== false
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {category.isActive !== false ? 'Active' : 'Inactive'}
-                          </div>
-
-                          <PermissionGate permission={PERMISSIONS.MENU_CATEGORIES_MANAGE}>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openModal(category)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(category.id)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </PermissionGate>
-                        </div>
-                      </div>
-                    </Card>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
+                      </Card>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
+      </DragErrorBoundary>
 
       {/* Empty state */}
       {(!Array.isArray(localCategories) || localCategories.length === 0) && (

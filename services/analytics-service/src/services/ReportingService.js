@@ -525,7 +525,8 @@ class ReportingService {
   }
 
   _getSchemaName(tenantId) {
-    return `tenant_${tenantId}`;
+    // Replace hyphens with underscores to make valid PostgreSQL identifiers
+    return `tenant_${tenantId.replace(/-/g, '_')}`;
   }
 }
 

@@ -17,6 +17,12 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Request timing middleware for performance tracking
+app.use((req, res, next) => {
+  req.startTime = Date.now();
+  next();
+});
+
 // Service registry with fallback URLs
 const serviceRegistry = {
   'tenant-service': 'http://localhost:3001',
@@ -116,26 +122,52 @@ app.get('/services', (req, res) => {
   });
 });
 
-// Defensive path rewrite function
+// Defensive path rewrite function with enhanced logging
 function rewritePath(path, prefix) {
+  console.log(`[ROUTING] Rewriting path: ${path} with prefix: ${prefix}`);
+  
   // Special handling for auth routes - they should keep the 'auth' part
   if (prefix === '/api/auth' && path.startsWith('/api/auth')) {
     // Convert /api/auth/login to /auth/login
-    return path.replace('/api/auth', '/auth');
+    const rewritten = path.replace('/api/auth', '/auth');
+    console.log(`[ROUTING] Auth path rewritten: ${path} -> ${rewritten}`);
+    return rewritten;
   }
   
   // Special handling for menu service routes - they should keep the full /api path
   if ((prefix === '/api/menu' || prefix === '/api/categories') && path.startsWith('/api/')) {
     // Keep the full path for menu service routes
+    console.log(`[ROUTING] Menu path preserved: ${path}`);
     return path;
+  }
+  
+  // Special handling for inventory menu-items routes - preserve sub-paths
+  if (prefix === '/api/inventory/menu-items' && path.startsWith('/api/inventory/menu-items')) {
+    // Convert /api/inventory/menu-items/status to /menu-items/status
+    const rewritten = path.replace('/api/inventory', '') || '/';
+    console.log(`[ROUTING] Inventory menu-items path rewritten: ${path} -> ${rewritten}`);
+    return rewritten;
+  }
+  
+  // Standard inventory routes
+  if (prefix === '/api/inventory' && path.startsWith('/api/inventory')) {
+    // Only rewrite if it's not a menu-items sub-route (handled above)
+    if (!path.startsWith('/api/inventory/menu-items')) {
+      const rewritten = path.replace('/api/inventory', '') || '/';
+      console.log(`[ROUTING] Standard inventory path rewritten: ${path} -> ${rewritten}`);
+      return rewritten;
+    }
   }
   
   // Only rewrite if the path actually starts with the prefix
   if (path.startsWith(prefix)) {
     const rewritten = path.replace(prefix, '') || '/';
+    console.log(`[ROUTING] Generic path rewritten: ${path} -> ${rewritten}`);
     return rewritten;
   }
+  
   // Pass through unchanged if prefix doesn't match
+  console.log(`[ROUTING] Path unchanged: ${path}`);
   return path;
 }
 
@@ -155,68 +187,120 @@ function createResilientProxy(serviceName, routePrefix) {
       const serviceUrl = getServiceUrlSync(serviceName);
       
       if (!serviceUrl) {
+        console.error(`[ROUTING ERROR] Service ${serviceName} not available for ${req.method} ${req.originalUrl}`);
         // This will cause the proxy to fail gracefully
         throw new Error(`Service ${serviceName} not available`);
       }
       
-      console.log(`Routing ${req.method} ${req.originalUrl} -> ${serviceUrl}`);
+      console.log(`[ROUTING] ${req.method} ${req.originalUrl} -> ${serviceUrl} (${serviceName})`);
+      console.log(`[ROUTING] Headers: ${JSON.stringify({
+        'x-tenant-id': req.headers['x-tenant-id'],
+        'x-request-id': req.headers['x-request-id'],
+        'content-type': req.headers['content-type'],
+        'authorization': req.headers['authorization'] ? '[REDACTED]' : undefined
+      })}`);
+      
       return serviceUrl;
     },
     
     // Graceful error handling - never crash the gateway
     onError: (err, req, res) => {
-      console.error(`Proxy error for ${serviceName}:`, err.message);
+      const errorId = `err-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      console.error(`[ERROR] ${errorId} - Proxy error for ${serviceName}:`, {
+        error: err.message,
+        code: err.code,
+        path: req.originalUrl,
+        method: req.method,
+        headers: req.headers,
+        timestamp: new Date().toISOString()
+      });
       
-      // Return clean 503 instead of crashing
+      // Return clean error response instead of crashing
       if (!res.headersSent) {
-        res.status(503).json({
+        // Determine error type and provide appropriate response
+        let errorResponse = {
+          success: false,
           error: 'Service temporarily unavailable',
           service: serviceName,
-          message: 'The requested service is currently offline or unreachable',
-          timestamp: new Date().toISOString()
-        });
+          timestamp: new Date().toISOString(),
+          errorId: errorId
+        };
+
+        if (err.code === 'ECONNREFUSED') {
+          errorResponse.message = `The ${serviceName} is currently offline. Please try again later.`;
+          errorResponse.code = 'SERVICE_OFFLINE';
+        } else if (err.code === 'ETIMEDOUT') {
+          errorResponse.message = `The ${serviceName} is taking too long to respond. Please try again.`;
+          errorResponse.code = 'SERVICE_TIMEOUT';
+        } else if (err.code === 'ENOTFOUND') {
+          errorResponse.message = `The ${serviceName} could not be found. Please contact support.`;
+          errorResponse.code = 'SERVICE_NOT_FOUND';
+        } else {
+          errorResponse.message = `An error occurred while communicating with ${serviceName}.`;
+          errorResponse.code = 'SERVICE_ERROR';
+        }
+
+        res.status(503).json(errorResponse);
       }
     },
     
-    // Request enhancement
+    // Request enhancement with detailed logging
     onProxyReq: (proxyReq, req, res) => {
+      const requestId = req.headers['x-request-id'] || 
+        `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
       // Forward tenant context
       if (req.headers['x-tenant-id']) {
         proxyReq.setHeader('x-tenant-id', req.headers['x-tenant-id']);
       }
       
       // Add request ID for tracing
-      const requestId = req.headers['x-request-id'] || 
-        `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       proxyReq.setHeader('x-request-id', requestId);
       
       // Add gateway info
       proxyReq.setHeader('x-forwarded-by', 'api-gateway');
       
-      // Forward the request body for POST/PUT requests
+      // Forward the request body for POST/PUT/PATCH requests
       if (req.body && (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH')) {
         const bodyData = JSON.stringify(req.body);
         proxyReq.setHeader('Content-Type', 'application/json');
         proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
         proxyReq.write(bodyData);
+        
+        console.log(`[PROXY REQ] ${req.method} ${req.originalUrl} -> ${serviceName} with body:`, 
+          JSON.stringify(req.body, null, 2));
+      } else {
+        console.log(`[PROXY REQ] ${req.method} ${req.originalUrl} -> ${serviceName} (no body)`);
       }
       
-      console.log(`Proxying ${req.method} ${req.originalUrl} -> ${serviceName} with body:`, req.body);
+      console.log(`[PROXY REQ] Request ID: ${requestId}, Tenant: ${req.headers['x-tenant-id'] || 'none'}`);
     },
     
-    // Response logging
+    // Response logging with detailed information
     onProxyRes: (proxyRes, req, res) => {
-      console.log(`${serviceName} responded: ${proxyRes.statusCode} for ${req.method} ${req.originalUrl}`);
+      const duration = Date.now() - (req.startTime || Date.now());
+      console.log(`[PROXY RES] ${serviceName} responded: ${proxyRes.statusCode} for ${req.method} ${req.originalUrl} (${duration}ms)`);
+      
+      if (proxyRes.statusCode >= 400) {
+        console.warn(`[PROXY RES] Error response from ${serviceName}:`, {
+          status: proxyRes.statusCode,
+          headers: proxyRes.headers,
+          path: req.originalUrl,
+          method: req.method
+        });
+      }
     }
   });
 }
 
 // Mount API routes under /api prefix to avoid conflicts
+// IMPORTANT: More specific routes must come BEFORE general routes
 const apiRoutes = {
   '/api/tenants': 'tenant-service',
   '/api/auth': 'tenant-service',  // Route auth to tenant service
   '/api/menu': 'menu-service',
   '/api/categories': 'menu-service',  // Route categories to menu service
+  '/api/inventory/menu-items': 'inventory-service',  // Explicit inventory menu-items route (MUST come before /api/inventory)
   '/api/inventory': 'inventory-service',
   '/api/pos': 'pos-service',
   '/api/online-orders': 'online-order-service',
@@ -226,8 +310,10 @@ const apiRoutes = {
   '/api/payments': 'payment-service'
 };
 
-// Create and mount proxy routes
-Object.entries(apiRoutes).forEach(([routePrefix, serviceName]) => {
+// Create and mount proxy routes in order of specificity (longest paths first)
+const sortedRoutes = Object.entries(apiRoutes).sort((a, b) => b[0].length - a[0].length);
+
+sortedRoutes.forEach(([routePrefix, serviceName]) => {
   const proxy = createResilientProxy(serviceName, routePrefix);
   app.use(routePrefix, proxy);
   console.log(`Mounted proxy: ${routePrefix} -> ${serviceName}`);
